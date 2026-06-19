@@ -1,0 +1,139 @@
+import { useEffect } from 'react';
+import { useCaseStore } from '@/store/useCaseStore';
+import VisitTimeline from './VisitTimeline';
+import {
+  X,
+  Building,
+  Calendar,
+  FileCheck,
+  User,
+} from 'lucide-react';
+import { TREATMENT_STAGES } from '@/utils/constants';
+import { cn } from '@/lib/utils';
+
+export default function CaseDetailDrawer() {
+  const { selectedCaseId, cases, selectCase } = useCaseStore();
+  const selectedCase = cases.find((c) => c.id === selectedCaseId) || null;
+
+  const isOpen = !!selectedCase;
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') selectCase(null);
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [selectCase]);
+
+  if (!selectedCase) return null;
+
+  const stageConfig = TREATMENT_STAGES.find((s) => s.key === selectedCase.currentStage);
+  const avatarColor = selectedCase.patient.gender === 'male'
+    ? 'bg-blue-100 text-blue-700'
+    : 'bg-pink-100 text-pink-700';
+
+  const genderLabel = selectedCase.patient.gender === 'male' ? '男' : '女';
+
+  return (
+    <>
+      <div
+        className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 animate-fadeIn"
+        onClick={() => selectCase(null)}
+      />
+
+      <div className="fixed top-0 right-0 bottom-0 w-[864px] max-w-full bg-white z-50 shadow-2xl flex flex-col animate-[slideInRight_0.3s_ease-out_forwards]">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 shrink-0">
+          <div className="flex items-center gap-4 min-w-0">
+            <div
+              className={cn(
+                'w-14 h-14 rounded-full flex items-center justify-center font-semibold text-xl shrink-0',
+                avatarColor
+              )}
+            >
+              {selectedCase.patient.name.charAt(0)}
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-xl font-bold text-slate-800 truncate">
+                  {selectedCase.patient.name}
+                </h2>
+                {stageConfig && (
+                  <span className={cn('badge text-xs', stageConfig.color)}>
+                    {selectedCase.currentStageLabel}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-4 mt-1 text-sm text-slate-500 flex-wrap">
+                <div className="flex items-center gap-1">
+                  <User className="w-3.5 h-3.5" />
+                  <span>{genderLabel} · {selectedCase.patient.age}岁</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <FileCheck className="w-3.5 h-3.5" />
+                  <span>{selectedCase.patient.caseNumber}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Building className="w-3.5 h-3.5" />
+                  <span className="truncate">{selectedCase.clinicName}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>开始：{selectedCase.startDate}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={() => selectCase(null)}
+            className="p-2 hover:bg-slate-100 rounded-xl transition-colors shrink-0"
+          >
+            <X className="w-5 h-5 text-slate-500" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6">
+          <VisitTimeline visits={selectedCase.visits} />
+        </div>
+
+        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-slate-500">
+              累计复诊 <span className="font-semibold text-slate-700">{selectedCase.totalVisits}</span> 次
+              <span className="mx-2">·</span>
+              最近复诊 <span className="font-semibold text-slate-700">{selectedCase.latestVisitDate}</span>
+            </div>
+            <button className="btn-primary">
+              <FileCheck className="w-4 h-4" />
+              进入质控反馈
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes slideInRight {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+      `}</style>
+    </>
+  );
+}

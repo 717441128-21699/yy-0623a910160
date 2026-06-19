@@ -26,7 +26,7 @@ import {
 import useDashboardStore from '@/store/useDashboardStore';
 import useCaseStore from '@/store/useCaseStore';
 import { mockClinics } from '@/mock/clinics';
-import { doctorNames, nurseNames } from '@/mock/cases';
+import { doctorNames, nurseNames, PHOTO_ANGLE_LABELS } from '@/mock/cases';
 import { cn } from '@/lib/utils';
 import type { PhotoAngle, ClinicInvolvedPerson } from '@/types';
 
@@ -50,7 +50,7 @@ const TIME_RANGES = [
 export default function ClinicDetailDrawer() {
   const navigate = useNavigate();
   const { selectedClinicId, clinicDetailData, dailyData, selectClinic, trendDays, setTrendDays } = useDashboardStore();
-  const { setFilter: setCaseFilter, applyFilter: applyCaseFilter } = useCaseStore();
+  const { setFilter: setCaseFilter, applyFilter: applyCaseFilter, setReviewSource } = useCaseStore();
   const selectedClinic = mockClinics.find((c) => c.id === selectedClinicId) || null;
   const clinicDailyData = dailyData.find((d) => d.clinicId === selectedClinicId) || null;
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -131,6 +131,14 @@ export default function ClinicDetailDrawer() {
       stage: null,
       dateRange: null,
     });
+    setReviewSource({
+      type: 'clinic',
+      clinicId: selectedClinicId,
+      clinicName: selectedClinic?.name || '',
+      sourceType: 'missingAngle',
+      sourceLabel: PHOTO_ANGLE_LABELS[angle],
+      trendDays,
+    });
     setTimeout(applyCaseFilter, 0);
     selectClinic(null);
     navigate('/cases');
@@ -140,7 +148,6 @@ export default function ClinicDetailDrawer() {
     if (!selectedClinicId) return;
     const personList = person.role === 'doctor' ? doctorNames : nurseNames;
     const foundPerson = personList.find((p) => p.name === person.name);
-    const idKey = person.role === 'doctor' ? 'doctorId' : 'nurseId';
 
     setCaseFilter({
       clinicId: selectedClinicId,
@@ -149,6 +156,15 @@ export default function ClinicDetailDrawer() {
       nurseId: person.role === 'nurse' && foundPerson ? foundPerson.id : null,
       stage: null,
       dateRange: null,
+    });
+    setReviewSource({
+      type: 'clinic',
+      clinicId: selectedClinicId,
+      clinicName: selectedClinic?.name || '',
+      sourceType: 'involvedPerson',
+      sourceLabel: person.name,
+      sourceDetail: person.role === 'doctor' ? '医生' : '护士',
+      trendDays,
     });
     setTimeout(applyCaseFilter, 0);
     selectClinic(null);

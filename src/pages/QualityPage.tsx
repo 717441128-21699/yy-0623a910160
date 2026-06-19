@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ImageIcon, ClipboardList, ShieldCheck, BellRing, CheckCircle2, ArrowRight, ListChecks } from 'lucide-react';
+import { ImageIcon, ClipboardList, ShieldCheck, BellRing, CheckCircle2, ArrowRight, ListChecks, RotateCcw, Info, X } from 'lucide-react';
 import { useQualityStore } from '@/store/useQualityStore';
 import { useCaseStore } from '@/store/useCaseStore';
 import PendingFeedbackList from '@/components/quality/PendingFeedbackList';
@@ -8,8 +8,11 @@ import IssueSidebar from '@/components/quality/IssueSidebar';
 import FeedbackForm from '@/components/quality/FeedbackForm';
 import FeedbackStatusTracker from '@/components/quality/FeedbackStatusTracker';
 import NurseReminderView from '@/components/quality/NurseReminderView';
-import type { IssueType, IssueMark } from '@/types';
+import type { IssueType, IssueMark, PhotoAngle } from '@/types';
 import { ISSUE_TYPES } from '@/utils/constants';
+import { doctorNames, nurseNames } from '@/mock/cases';
+import { mockClinics } from '@/mock/clinics';
+import { PHOTO_ANGLE_LABELS } from '@/mock/dashboardStats';
 import { cn } from '@/lib/utils';
 
 type PageTab = 'pending' | 'tracker' | 'nurse';
@@ -17,6 +20,7 @@ type PageTab = 'pending' | 'tracker' | 'nurse';
 export default function QualityPage() {
   const {
     pendingPhotos,
+    filteredPendingPhotos,
     selectedPendingIndex,
     currentAnnotation,
     setCurrentAnnotationPhoto,
@@ -28,6 +32,11 @@ export default function QualityPage() {
     selectedFeedbackId,
     highlightedFeedbackIds,
     selectFeedback,
+    qualityFilter,
+    setQualityFilter,
+    resetQualityFilter,
+    reviewSource,
+    clearReviewSource,
   } = useQualityStore();
   const { selectCase } = useCaseStore();
 
@@ -37,6 +46,14 @@ export default function QualityPage() {
   const [submittedFeedbackIds, setSubmittedFeedbackIds] = useState<string[]>([]);
   const [submittedAssignee, setSubmittedAssignee] = useState('');
   const primaryButtonRef = useRef<HTMLButtonElement>(null);
+
+  const hasReviewSource = reviewSource !== null;
+  const hasActiveFilter =
+    qualityFilter.clinicId ||
+    qualityFilter.doctorId ||
+    qualityFilter.nurseId ||
+    qualityFilter.missingAngle ||
+    qualityFilter.status;
 
   const handleViewTracker = (feedbackId: string) => {
     addHighlights([feedbackId]);
@@ -70,14 +87,15 @@ export default function QualityPage() {
   }, [activeTab, selectedFeedbackId, highlightedFeedbackIds, selectFeedback, clearHighlights]);
 
   useEffect(() => {
-    if (pendingPhotos.length > 0 && currentAnnotation.photoId === null) {
-      const firstPhoto = pendingPhotos[0];
+    const photos = hasActiveFilter ? filteredPendingPhotos : pendingPhotos;
+    if (photos.length > 0 && currentAnnotation.photoId === null) {
+      const firstPhoto = photos[0];
       setCurrentAnnotationPhoto(firstPhoto.photo.id);
     }
-  }, [pendingPhotos, currentAnnotation.photoId, setCurrentAnnotationPhoto]);
+  }, [pendingPhotos, filteredPendingPhotos, currentAnnotation.photoId, setCurrentAnnotationPhoto, hasActiveFilter]);
 
   const currentPhoto =
-    pendingPhotos[selectedPendingIndex]?.photo ?? null;
+    (hasActiveFilter ? filteredPendingPhotos[selectedPendingIndex] : pendingPhotos[selectedPendingIndex])?.photo ?? null;
 
   const handleAddMark = (rect: { x: number; y: number; w: number; h: number }) => {
     if (!selectedIssueType || !currentPhoto) return;
@@ -121,8 +139,9 @@ export default function QualityPage() {
     setSubmittedFeedbackIds([]);
     setSubmittedAssignee('');
     clearHighlights();
-    if (pendingPhotos.length > 0) {
-      setCurrentAnnotationPhoto(pendingPhotos[0].photo.id);
+    const photos = hasActiveFilter ? filteredPendingPhotos : pendingPhotos;
+    if (photos.length > 0) {
+      setCurrentAnnotationPhoto(photos[0].photo.id);
     }
   };
 
@@ -139,6 +158,38 @@ export default function QualityPage() {
     setShowSuccessModal(false);
     setSubmittedFeedbackIds([]);
     setSubmittedAssignee('');
+  };
+
+  const handleClinicChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setQualityFilter({ clinicId: e.target.value || null });
+  };
+
+  const handleDoctorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setQualityFilter({ doctorId: e.target.value || null });
+  };
+
+  const handleNurseChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setQualityFilter({ nurseId: e.target.value || null });
+  };
+
+  const handleMissingAngleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setQualityFilter({ missingAngle: (e.target.value as PhotoAngle) || null });
+  };
+
+  const handleResetFilter = () => {
+    if (hasReviewSource) {
+      clearReviewSource();
+    } else {
+      resetQualityFilter();
+    }
+  };
+
+  const getReviewSourceText = () => {
+    if (!reviewSource) return '';
+    const parts = [reviewSource.clinicName];
+    if (reviewSource.doctorName) parts.push(reviewSource.doctorName);
+    if (reviewSource.nurseName) parts.push(reviewSource.nurseName);
+    return parts.join(' · ');
   };
 
   return (
@@ -194,6 +245,113 @@ export default function QualityPage() {
           </div>
         </div>
       </header>
+
+      <div className="flex-shrink-0 border-b border-slate-200 bg-white px-6 py-3">
+        {hasReviewSource && (
+          <div className="mb-3 flex items-center justify-between rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5">
+            <div className="flex items-center gap-2 text-sm text-blue-700">
+              <Info className="h-4 w-4 flex-shrink-0" />
+              <span>
+                来自门店复盘：<span className="font-semibold">{getReviewSourceText()}</span>
+              </span>
+            </div>
+            <button
+              onClick={clearReviewSource}
+              className="inline-flex items-center gap-1 rounded-md bg-white px-3 py-1 text-xs font-medium text-blue-600 shadow-sm ring-1 ring-blue-200 transition-colors hover:bg-blue-50"
+            >
+              <X className="h-3 w-3" />
+              清除筛选
+            </button>
+          </div>
+        )}
+        <div
+          className={cn(
+            'flex flex-wrap items-center gap-4 rounded-xl p-3 transition-all',
+            hasReviewSource
+              ? 'border border-blue-200 bg-blue-50/50'
+              : 'bg-slate-50'
+          )}
+        >
+          {hasReviewSource && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">
+              <Info className="h-3 w-3" />
+              当前为复盘来源筛选条件
+            </span>
+          )}
+
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-slate-700 whitespace-nowrap">门店</label>
+            <select
+              className="input-field !py-2 !text-sm min-w-[180px]"
+              value={qualityFilter.clinicId || ''}
+              onChange={handleClinicChange}
+            >
+              <option value="">全部门店</option>
+              {mockClinics.map((clinic) => (
+                <option key={clinic.id} value={clinic.id}>
+                  {clinic.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-slate-700 whitespace-nowrap">医生</label>
+            <select
+              className="input-field !py-2 !text-sm min-w-[140px]"
+              value={qualityFilter.doctorId || ''}
+              onChange={handleDoctorChange}
+            >
+              <option value="">全部医生</option>
+              {doctorNames.map((doc) => (
+                <option key={doc.id} value={doc.id}>
+                  {doc.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-slate-700 whitespace-nowrap">护士</label>
+            <select
+              className="input-field !py-2 !text-sm min-w-[140px]"
+              value={qualityFilter.nurseId || ''}
+              onChange={handleNurseChange}
+            >
+              <option value="">全部护士</option>
+              {nurseNames.map((nurse) => (
+                <option key={nurse.id} value={nurse.id}>
+                  {nurse.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-slate-700 whitespace-nowrap">缺失角度</label>
+            <select
+              className="input-field !py-2 !text-sm min-w-[160px]"
+              value={qualityFilter.missingAngle || ''}
+              onChange={handleMissingAngleChange}
+            >
+              <option value="">全部角度</option>
+              {Object.entries(PHOTO_ANGLE_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            onClick={handleResetFilter}
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors duration-200 shadow-sm"
+          >
+            <RotateCcw className="w-4 h-4" />
+            重置筛选
+          </button>
+        </div>
+      </div>
 
       <main className="flex-1 overflow-hidden">
         {activeTab === 'pending' ? (

@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { FollowUpVisit, QualityFeedback, Photo } from '@/types';
+import type { FollowUpVisit, QualityFeedback, Photo, CaseFilter } from '@/types';
 import PhotoGrid from './PhotoGrid';
 import { PHOTO_ANGLE_LABELS } from '@/mock/cases';
 import { useQualityStore } from '@/store/useQualityStore';
@@ -14,12 +14,19 @@ import {
   ClipboardCheck,
   X,
   ExternalLink,
+  ArrowRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+interface VisitHitInfo {
+  type: 'missingAngle' | 'doctor' | 'nurse';
+  label: string;
+}
 
 interface VisitTimelineProps {
   visits: FollowUpVisit[];
   caseId: string;
+  filter: CaseFilter;
 }
 
 const STAGE_DOT_COLORS: Record<string, string> = {
@@ -62,7 +69,7 @@ const STATUS_COLORS_DETAIL: Record<string, string> = {
   rejected: 'bg-danger-100 text-danger-700',
 };
 
-export default function VisitTimeline({ visits, caseId }: VisitTimelineProps) {
+export default function VisitTimeline({ visits, caseId, filter }: VisitTimelineProps) {
   const { feedbacks, addHighlights, selectFeedback } = useQualityStore();
   const navigate = useNavigate();
   const sortedVisits = useMemo(() => [...visits].reverse(), [visits]);
@@ -73,9 +80,42 @@ export default function VisitTimeline({ visits, caseId }: VisitTimelineProps) {
     photo: Photo;
     visitId: string;
   } | null>(null);
+  const feedbackSectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  const getVisitHitInfo = (visit: FollowUpVisit): VisitHitInfo[] => {
+    const hits: VisitHitInfo[] = [];
+
+    if (filter.missingAngle && visit.missingAngles.includes(filter.missingAngle)) {
+      hits.push({ type: 'missingAngle', label: PHOTO_ANGLE_LABELS[filter.missingAngle] });
+    }
+
+    if (filter.doctorId && visit.doctorId === filter.doctorId) {
+      hits.push({ type: 'doctor', label: visit.doctorName });
+    }
+
+    if (filter.nurseId && visit.nurseId === filter.nurseId) {
+      hits.push({ type: 'nurse', label: visit.nurseName });
+    }
+
+    return hits;
+  };
+
+  const hasActiveFilter = !!(filter.missingAngle || filter.doctorId || filter.nurseId);
 
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
+  };
+
+  const handleJumpToFeedback = (visitId: string) => {
+    if (expandedId !== visitId) {
+      setExpandedId(visitId);
+    }
+    setTimeout(() => {
+      const ref = feedbackSectionRefs.current[visitId];
+      if (ref) {
+        ref.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 100);
   };
 
   const getVisitFeedbacks = (visitId: string): QualityFeedback[] => {
@@ -126,13 +166,17 @@ export default function VisitTimeline({ visits, caseId }: VisitTimelineProps) {
           const hasMissingAngles = visit.missingAngles.length > 0;
           const stats = getFeedbackStats(visit.id);
           const visitFeedbacks = getVisitFeedbacks(visit.id);
+          const hitInfos = hasActiveFilter ? getVisitHitInfo(visit) : [];
+          const isHit = hitInfos.length > 0;
+          const hasFeedbacks = stats.total > 0;
 
           return (
             <div key={visit.id} className="relative pl-12">
               <div
                 className={cn(
-                  'absolute left-0 top-5 w-10 h-10 rounded-full border-4 border-white flex items-center justify-center z-10 shadow-md',
-                  STAGE_DOT_COLORS[visit.stage] || 'bg-slate-500'
+                  'absolute left-0 top-5 w-10 h-10 rounded-full border-4 border-white flex items-center justify-center z-10 shadow-md transition-all duration-300',
+                  STAGE_DOT_COLORS[visit.stage] || 'bg-slate-500',
+                  isHit && 'ring-4 ring-amber-400 ring-offset-2'
                 )}
               >
                 <span className="w-3 h-3 rounded-full bg-white/90" />
@@ -141,7 +185,10 @@ export default function VisitTimeline({ visits, caseId }: VisitTimelineProps) {
               <div
                 onClick={() => toggleExpand(visit.id)}
                 className={cn(
-                  'bg-white rounded-2xl border border-slate-100 shadow-card cursor-pointer transition-all duration-300',
+                  'rounded-2xl border shadow-card cursor-pointer transition-all duration-300 overflow-hidden',
+                  isHit
+                    ? 'bg-amber-50/40 border-l-4 border-l-amber-400 border-t border-r border-b border-slate-200'
+                    : 'bg-white border-slate-100',
                   isExpanded ? 'shadow-elevated' : 'hover:shadow-elevated'
                 )}
               >
@@ -162,6 +209,40 @@ export default function VisitTimeline({ visits, caseId }: VisitTimelineProps) {
                         <span className={cn('badge text-[11px]', stageConfig.color)}>
                           {visit.stageLabel}
                         </span>
+                      )}
+                      {isHit && hitInfos.map((hit, idx) => (
+                        <div key={`${hit.type}-${idx}`} className="flex items-center gap-1">
+                          {hit.type === 'missingAngle' && (
+                            <div className="flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-[11px] font-medium">
+                              <AlertTriangle className="w-3 h-3" />
+                              漏拍：{hit.label}
+                            </div>
+                          )}
+                          {hit.type === 'doctor' && (
+                            <div className="flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-[11px] font-medium">
+                              <Stethoscope className="w-3 h-3" />
+                              医生：{hit.label}
+                            </div>
+                          )}
+                          {hit.type === 'nurse' && (
+                            <div className="flex items-center gap-1 px-2 py-0.5 bg-cyan-100 text-cyan-700 rounded-full text-[11px] font-medium">
+                              <UserRound className="w-3 h-3" />
+                              护士：{hit.label}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {isHit && hasFeedbacks && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleJumpToFeedback(visit.id);
+                          }}
+                          className="flex items-center gap-0.5 px-2 py-0.5 bg-primary-50 text-primary-600 hover:bg-primary-100 rounded-full text-[11px] font-medium transition-colors"
+                        >
+                          <ArrowRight className="w-3 h-3" />
+                          质控已介入
+                        </button>
                       )}
                       {stats.total > 0 && (
                         <div className="flex items-center gap-1.5">
@@ -218,7 +299,12 @@ export default function VisitTimeline({ visits, caseId }: VisitTimelineProps) {
 
                 {isExpanded && (
                   <div className="px-5 pb-5 border-t border-slate-100 pt-5 animate-fadeIn">
-                    <div className="mb-5">
+                    <div
+                      ref={(el) => {
+                        feedbackSectionRefs.current[visit.id] = el;
+                      }}
+                      className="mb-5 scroll-mt-24"
+                    >
                       <div className="flex items-center gap-2 mb-3">
                         <ClipboardCheck className="w-4 h-4 text-primary-600" />
                         <h4 className="text-sm font-semibold text-slate-700">

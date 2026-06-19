@@ -5,13 +5,22 @@ import { mockCases } from '@/mock/cases';
 import { cn } from '@/lib/utils';
 
 export default function PendingFeedbackList() {
-  const { pendingPhotos, selectedPendingIndex, setCurrentAnnotationPhoto } = useQualityStore();
+  const { pendingPhotos, filteredPendingPhotos, selectedPendingIndex, setCurrentAnnotationPhoto, qualityFilter } = useQualityStore();
   const [searchText, setSearchText] = useState('');
 
+  const hasActiveFilter =
+    qualityFilter.clinicId ||
+    qualityFilter.doctorId ||
+    qualityFilter.nurseId ||
+    qualityFilter.missingAngle ||
+    qualityFilter.status;
+
+  const displayPhotos = hasActiveFilter ? filteredPendingPhotos : pendingPhotos;
+
   const filteredItems = useMemo(() => {
-    if (!searchText.trim()) return pendingPhotos;
+    if (!searchText.trim()) return displayPhotos;
     const keyword = searchText.toLowerCase();
-    return pendingPhotos.filter((item) => {
+    return displayPhotos.filter((item) => {
       const caseItem = mockCases.find((c) => c.id === item.caseId);
       const patientName = caseItem?.patient.name?.toLowerCase() ?? '';
       const clinicName = caseItem?.clinicName?.toLowerCase() ?? '';
@@ -24,10 +33,10 @@ export default function PendingFeedbackList() {
         photographer.includes(keyword)
       );
     });
-  }, [pendingPhotos, searchText]);
+  }, [displayPhotos, searchText]);
 
-  const handleSelect = (index: number, item: typeof pendingPhotos[number]) => {
-    const realIndex = pendingPhotos.findIndex((p) => p.photo.id === item.photo.id);
+  const handleSelect = (index: number, item: typeof displayPhotos[number]) => {
+    const realIndex = displayPhotos.findIndex((p) => p.photo.id === item.photo.id);
     if (realIndex >= 0) {
       setCurrentAnnotationPhoto(item.photo.id);
     }
@@ -40,7 +49,7 @@ export default function PendingFeedbackList() {
           <h2 className="text-sm font-semibold text-slate-800">待质控照片</h2>
           <span className="flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600">
             <AlertCircle className="h-3 w-3" />
-            {pendingPhotos.length}
+            {displayPhotos.length}
           </span>
         </div>
         <div className="relative">
@@ -65,7 +74,7 @@ export default function PendingFeedbackList() {
           <ul className="divide-y divide-slate-100">
             {filteredItems.map((item) => {
               const caseItem = mockCases.find((c) => c.id === item.caseId);
-              const realIndex = pendingPhotos.findIndex((p) => p.photo.id === item.photo.id);
+              const realIndex = displayPhotos.findIndex((p) => p.photo.id === item.photo.id);
               const isSelected = realIndex === selectedPendingIndex;
 
               return (

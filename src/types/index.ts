@@ -193,3 +193,25 @@ export interface ClinicDetailData {
   missingAngleRanking: ClinicMissingAngleRank[];
   involvedPeople: ClinicInvolvedPerson[];
 }
+
+export interface QualityFilter {
+  clinicId: string | null;
+  doctorId: string | null;
+  nurseId: string | null;
+  missingAngle: PhotoAngle | null;
+  status: FeedbackStatus | null;
+}
+
+export interface ReviewSource {
+  type: 'clinic';
+  clinicId: string;
+  clinicName: string;
+  sourceType: 'missingAngle' | 'involvedPerson';
+  sourceLabel: string;
+  sourceDetail?: string;
+  trendDays: number;
+  doctorId?: string;
+  doctorName?: string;
+  nurseId?: string;
+  nurseName?: string;
+}

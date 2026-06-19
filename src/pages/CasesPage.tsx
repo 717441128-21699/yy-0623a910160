@@ -1,21 +1,48 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useCaseStore } from '@/store/useCaseStore';
 import { useQualityStore } from '@/store/useQualityStore';
+import { useDashboardStore } from '@/store/useDashboardStore';
 import CaseFilterBar from '@/components/cases/CaseFilterBar';
 import CaseCard from '@/components/cases/CaseCard';
 import CaseDetailDrawer from '@/components/cases/CaseDetailDrawer';
-import { ChevronLeft, ChevronRight, FolderSearch2, ClipboardList } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  FolderSearch2,
+  ClipboardList,
+  Building,
+  Stethoscope,
+  UserRound,
+  AlertTriangle,
+  Activity,
+  Calendar,
+  X,
+  Link2,
+  ArrowLeft,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { mockClinics } from '@/mock/clinics';
+import { doctorNames, nurseNames, PHOTO_ANGLE_LABELS, STAGE_LABELS } from '@/mock/cases';
+import type { CaseFilter } from '@/types';
 
 const PAGE_SIZE = 12;
 
 export default function CasesPage() {
+  const navigate = useNavigate();
   const {
     loadCases,
     filteredCases,
     cases,
+    filter,
+    setFilter,
+    applyFilter,
+    resetFilter,
+    reviewSource,
+    clearReviewSource,
   } = useCaseStore();
   const { loadInitialData } = useQualityStore();
+  const { selectClinic: selectDashboardClinic } = useDashboardStore();
 
   useEffect(() => {
     if (cases.length === 0) {
@@ -43,6 +70,118 @@ export default function CasesPage() {
     setCurrentPage(Math.min(Math.max(1, page), totalPages));
   };
 
+  const hasActiveFilter = useMemo(() => {
+    return (
+      filter.clinicId ||
+      filter.doctorId ||
+      filter.nurseId ||
+      filter.stage ||
+      filter.missingAngle ||
+      filter.dateRange
+    );
+  }, [filter]);
+
+  const handleRemoveFilter = (key: keyof CaseFilter) => {
+    if (key === 'dateRange') {
+      setFilter({ dateRange: null });
+    } else {
+      setFilter({ [key]: null } as Partial<CaseFilter>);
+    }
+    setTimeout(applyFilter, 0);
+  };
+
+  const handleReturnToDashboard = () => {
+    if (reviewSource) {
+      selectDashboardClinic(reviewSource.clinicId);
+    }
+    navigate('/dashboard');
+  };
+
+  const getSourceDescription = () => {
+    if (!reviewSource) return '';
+    if (reviewSource.sourceType === 'missingAngle') {
+      return `缺失角度 ${reviewSource.sourceLabel}`;
+    }
+    if (reviewSource.sourceDetail) {
+      return `涉及${reviewSource.sourceDetail} ${reviewSource.sourceLabel}`;
+    }
+    return reviewSource.sourceLabel;
+  };
+
+  const filterTags = useMemo(() => {
+    const tags: {
+      key: keyof CaseFilter;
+      label: string;
+      icon: typeof Building;
+      color: string;
+    }[] = [];
+
+    if (filter.clinicId) {
+      const clinic = mockClinics.find((c) => c.id === filter.clinicId);
+      if (clinic) {
+        tags.push({
+          key: 'clinicId',
+          label: clinic.name,
+          icon: Building,
+          color: 'bg-blue-100 text-blue-700 border-blue-200',
+        });
+      }
+    }
+
+    if (filter.doctorId) {
+      const doctor = doctorNames.find((d) => d.id === filter.doctorId);
+      if (doctor) {
+        tags.push({
+          key: 'doctorId',
+          label: doctor.name,
+          icon: Stethoscope,
+          color: 'bg-violet-100 text-violet-700 border-violet-200',
+        });
+      }
+    }
+
+    if (filter.nurseId) {
+      const nurse = nurseNames.find((n) => n.id === filter.nurseId);
+      if (nurse) {
+        tags.push({
+          key: 'nurseId',
+          label: nurse.name,
+          icon: UserRound,
+          color: 'bg-cyan-100 text-cyan-700 border-cyan-200',
+        });
+      }
+    }
+
+    if (filter.missingAngle) {
+      tags.push({
+        key: 'missingAngle',
+        label: PHOTO_ANGLE_LABELS[filter.missingAngle],
+        icon: AlertTriangle,
+        color: 'bg-orange-100 text-orange-700 border-orange-200',
+      });
+    }
+
+    if (filter.stage) {
+      tags.push({
+        key: 'stage',
+        label: STAGE_LABELS[filter.stage],
+        icon: Activity,
+        color: 'bg-green-100 text-green-700 border-green-200',
+      });
+    }
+
+    if (filter.dateRange && filter.dateRange[0] && filter.dateRange[1]) {
+      tags.push({
+        key: 'dateRange',
+        label: `${filter.dateRange[0]} ~ ${filter.dateRange[1]}`,
+        icon: Calendar,
+        color: 'bg-slate-100 text-slate-700 border-slate-200',
+      });
+    }
+
+    return tags;
+  }, [filter]);
+
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-[1600px] mx-auto px-6 py-8">
@@ -57,6 +196,94 @@ export default function CasesPage() {
             </div>
           </div>
         </div>
+
+        {reviewSource && (
+          <div className="mb-5 rounded-2xl border border-primary-200 bg-gradient-to-r from-primary-50 to-blue-50 p-5">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-lg bg-primary-100 flex items-center justify-center shrink-0">
+                <Link2 className="w-5 h-5 text-primary-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                  <span className="text-sm font-semibold text-primary-700">
+                    来自门店复盘
+                  </span>
+                  <span className="text-primary-400">·</span>
+                  <span className="text-sm font-medium text-slate-700">
+                    {reviewSource.clinicName}
+                  </span>
+                  <span className="text-primary-400">·</span>
+                  <span className="text-sm text-slate-600">
+                    近{reviewSource.trendDays}天
+                  </span>
+                </div>
+                <p className="text-sm text-slate-600">
+                  您正在查看{' '}
+                  <span className="font-medium text-slate-800">
+                    {getSourceDescription()}
+                  </span>{' '}
+                  的病例（共{' '}
+                  <span className="font-semibold text-slate-800">
+                    {filteredCases.length}
+                  </span>{' '}
+                  例）
+                </p>
+                <div className="flex items-center gap-3 mt-4">
+                  <button
+                    onClick={handleReturnToDashboard}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-xl hover:bg-primary-700 transition-colors duration-200 shadow-sm"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    返回门店详情继续复盘
+                  </button>
+                  <button
+                    onClick={clearReviewSource}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors duration-200"
+                  >
+                    清除来源
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {hasActiveFilter && (
+          <div className="mb-5 flex items-center gap-3 flex-wrap">
+            <span className="text-sm font-medium text-slate-600 shrink-0">
+              当前筛选：
+            </span>
+            <div className="flex items-center gap-2 flex-wrap flex-1">
+              {filterTags.map((tag) => {
+                const Icon = tag.icon;
+                return (
+                  <span
+                    key={tag.key}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border',
+                      tag.color
+                    )}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    <span className="max-w-[200px] truncate">{tag.label}</span>
+                    <button
+                      onClick={() => handleRemoveFilter(tag.key)}
+                      className="ml-0.5 p-0.5 rounded hover:bg-black/5 transition-colors"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                );
+              })}
+            </div>
+            <button
+              onClick={resetFilter}
+              className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors duration-200"
+            >
+              清空筛选
+            </button>
+          </div>
+        )}
 
         <div className="mb-5">
           <CaseFilterBar />

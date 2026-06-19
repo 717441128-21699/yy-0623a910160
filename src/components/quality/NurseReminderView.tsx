@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { CheckCircle, ChevronRight, AlertTriangle, Store, UserCircle2 } from 'lucide-react';
 import { useQualityStore } from '@/store/useQualityStore';
 import { mockClinics } from '@/mock/clinics';
@@ -75,13 +75,28 @@ function getAvatarColor(name: string): string {
 }
 
 export default function NurseReminderView({ onViewTracker, onViewCase }: NurseReminderViewProps) {
-  const { feedbacks } = useQualityStore();
+  const { feedbacks, filteredFeedbacks, qualityFilter } = useQualityStore();
   const [selectedClinicId, setSelectedClinicId] = useState<string>('all');
   const [selectedNurse, setSelectedNurse] = useState<string>('all');
   const [selectedFeedbackId, setSelectedFeedbackId] = useState<string | null>(null);
 
+  const hasActiveFilter =
+    qualityFilter.clinicId ||
+    qualityFilter.doctorId ||
+    qualityFilter.nurseId ||
+    qualityFilter.missingAngle ||
+    qualityFilter.status;
+
+  const sourceFeedbacks = hasActiveFilter ? filteredFeedbacks : feedbacks;
+
+  useEffect(() => {
+    if (qualityFilter.clinicId) {
+      setSelectedClinicId(qualityFilter.clinicId);
+    }
+  }, [qualityFilter.clinicId]);
+
   const extendedFeedbacks = useMemo<ExtendedFeedback[]>(() => {
-    return feedbacks
+    return sourceFeedbacks
       .filter((fb) => fb.status === 'pending')
       .map((fb) => {
         const caseItem = mockCases.find((c) => c.id === fb.caseId);
@@ -94,14 +109,14 @@ export default function NurseReminderView({ onViewTracker, onViewCase }: NurseRe
           angleLabel: photo?.angleLabel ?? '',
         };
       });
-  }, [feedbacks]);
+  }, [sourceFeedbacks]);
 
   const availableNurses = useMemo(() => {
     if (selectedClinicId === 'all') return nurseNames;
     return nurseNames.filter((n) => n.clinicId === selectedClinicId);
   }, [selectedClinicId]);
 
-  const filteredFeedbacks = useMemo(() => {
+  const filteredFeedbacksDisplay = useMemo(() => {
     let result = extendedFeedbacks;
     if (selectedClinicId !== 'all') {
       result = result.filter((fb) => fb.assigneeClinicId === selectedClinicId);
@@ -109,13 +124,19 @@ export default function NurseReminderView({ onViewTracker, onViewCase }: NurseRe
     if (selectedNurse !== 'all') {
       result = result.filter((fb) => fb.assignee === selectedNurse);
     }
+    if (qualityFilter.nurseId) {
+      const nurse = nurseNames.find((n) => n.id === qualityFilter.nurseId);
+      if (nurse) {
+        result = result.filter((fb) => fb.assignee === nurse.name);
+      }
+    }
     return result;
-  }, [extendedFeedbacks, selectedClinicId, selectedNurse]);
+  }, [extendedFeedbacks, selectedClinicId, selectedNurse, qualityFilter.nurseId]);
 
   const nurseGroups = useMemo<NurseGroup[]>(() => {
     const groups = new Map<string, NurseGroup>();
 
-    filteredFeedbacks.forEach((fb) => {
+    filteredFeedbacksDisplay.forEach((fb) => {
       const nurseName = fb.assignee;
       const clinicId = fb.assigneeClinicId;
       const clinic = mockClinics.find((c) => c.id === clinicId);
@@ -141,10 +162,10 @@ export default function NurseReminderView({ onViewTracker, onViewCase }: NurseRe
       if (b.overdueCount !== a.overdueCount) return b.overdueCount - a.overdueCount;
       return b.feedbacks.length - a.feedbacks.length;
     });
-  }, [filteredFeedbacks]);
+  }, [filteredFeedbacksDisplay]);
 
-  const totalPending = filteredFeedbacks.length;
-  const totalOverdue = filteredFeedbacks.filter((fb) => isOverdue(fb.createdAt)).length;
+  const totalPending = filteredFeedbacksDisplay.length;
+  const totalOverdue = filteredFeedbacksDisplay.filter((fb) => isOverdue(fb.createdAt)).length;
 
   const handleClinicChange = (value: string) => {
     setSelectedClinicId(value);

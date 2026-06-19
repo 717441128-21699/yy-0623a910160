@@ -6,6 +6,8 @@ import type {
   IssueMark,
   QualityFeedback,
   FeedbackStatus,
+  QualityFilter,
+  ReviewSource,
 } from '../types';
 import { mockCases, extractPendingPhotos } from '../mock/cases';
 import { mockFeedbacks } from '../mock/feedbacks';
@@ -17,10 +19,22 @@ const STATUS_LABELS: Record<FeedbackStatus, string> = {
   rejected: '已驳回',
 };
 
+const initialFilter: QualityFilter = {
+  clinicId: null,
+  doctorId: null,
+  nurseId: null,
+  missingAngle: null,
+  status: null,
+};
+
 interface QualityState {
   pendingPhotos: PendingPhotoItem[];
+  filteredPendingPhotos: PendingPhotoItem[];
   currentAnnotation: CurrentAnnotation;
   feedbacks: QualityFeedback[];
+  filteredFeedbacks: QualityFeedback[];
+  qualityFilter: QualityFilter;
+  reviewSource: ReviewSource | null;
   selectedPendingIndex: number;
   highlightedFeedbackIds: string[];
   selectedFeedbackId: string | null;
@@ -37,6 +51,12 @@ interface QualityState {
   getFeedbacksByPhoto: (photoId: string) => QualityFeedback[];
   loadInitialData: () => void;
   refreshPendingPhotos: () => void;
+  setQualityFilter: (partial: Partial<QualityFilter>) => void;
+  applyQualityFilter: () => void;
+  resetQualityFilter: () => void;
+  setReviewSource: (source: ReviewSource | null) => void;
+  applyReviewSourceFilter: () => void;
+  clearReviewSource: () => void;
 }
 
 const genId = (): string =>
@@ -46,17 +66,21 @@ export const useQualityStore = create<QualityState>()(
   persist(
     (set, get) => ({
       pendingPhotos: [],
+      filteredPendingPhotos: [],
       currentAnnotation: {
         photoId: null,
         marks: [],
       },
       feedbacks: [],
+      filteredFeedbacks: [],
+      qualityFilter: initialFilter,
+      reviewSource: null,
       selectedPendingIndex: 0,
       highlightedFeedbackIds: [],
       selectedFeedbackId: null,
 
       setCurrentAnnotationPhoto: (photoId: string | null) => {
-        const { pendingPhotos } = get();
+        const { filteredPendingPhotos } = get();
         if (!photoId) {
           set({
             selectedPendingIndex: 0,
@@ -64,18 +88,18 @@ export const useQualityStore = create<QualityState>()(
           });
           return;
         }
-        const index = pendingPhotos.findIndex((item) => item.photo.id === photoId);
+        const index = filteredPendingPhotos.findIndex((item) => item.photo.id === photoId);
         if (index >= 0) {
-          const marks = pendingPhotos[index].photo.issueMarks ?? [];
+          const marks = filteredPendingPhotos[index].photo.issueMarks ?? [];
           set({
             selectedPendingIndex: index,
             currentAnnotation: { photoId, marks: marks.length > 0 ? [...marks] : [] },
           });
-        } else if (pendingPhotos.length > 0) {
-          const marks = pendingPhotos[0].photo.issueMarks ?? [];
+        } else if (filteredPendingPhotos.length > 0) {
+          const marks = filteredPendingPhotos[0].photo.issueMarks ?? [];
           set({
             selectedPendingIndex: 0,
-            currentAnnotation: { photoId: pendingPhotos[0].photo.id, marks: marks.length > 0 ? [...marks] : [] },
+            currentAnnotation: { photoId: filteredPendingPhotos[0].photo.id, marks: marks.length > 0 ? [...marks] : [] },
           });
         } else {
           set({
@@ -104,8 +128,8 @@ export const useQualityStore = create<QualityState>()(
       },
 
       submitFeedback: (data: { suggestion: string; assignee: string }) => {
-        const { currentAnnotation, pendingPhotos, selectedPendingIndex } = get();
-        const pendingItem = pendingPhotos[selectedPendingIndex];
+        const { currentAnnotation, filteredPendingPhotos, selectedPendingIndex } = get();
+        const pendingItem = filteredPendingPhotos[selectedPendingIndex];
 
         if (!pendingItem || currentAnnotation.marks.length === 0) return [];
 
@@ -135,15 +159,8 @@ export const useQualityStore = create<QualityState>()(
           },
         }));
 
-        const updatedFeedbacks = get().feedbacks;
-        const feedbackPhotoIds = new Set(updatedFeedbacks.map((fb) => fb.photoId));
-        const allPending = extractPendingPhotos(mockCases);
-        const filtered = allPending.filter((item) => !feedbackPhotoIds.has(item.photo.id));
-
-        set({
-          pendingPhotos: filtered,
-          selectedPendingIndex: 0,
-        });
+        get().applyQualityFilter();
+        get().refreshPendingPhotos();
 
         return newFeedbackIds;
       },
@@ -186,6 +203,7 @@ export const useQualityStore = create<QualityState>()(
             };
           }),
         }));
+        get().applyQualityFilter();
       },
 
       refreshPendingPhotos: () => {
@@ -194,6 +212,7 @@ export const useQualityStore = create<QualityState>()(
         const allPending = extractPendingPhotos(mockCases);
         const filtered = allPending.filter((item) => !feedbackPhotoIds.has(item.photo.id));
         set({ pendingPhotos: filtered, selectedPendingIndex: 0 });
+        get().applyQualityFilter();
       },
 
       loadInitialData: () => {
@@ -221,6 +240,107 @@ export const useQualityStore = create<QualityState>()(
             marks: [],
           },
         });
+
+        get().applyQualityFilter();
+
+        if (get().reviewSource) {
+          get().applyReviewSourceFilter();
+        }
+      },
+
+      setQualityFilter: (partial: Partial<QualityFilter>) => {
+        set((state) => ({
+          qualityFilter: { ...state.qualityFilter, ...partial },
+        }));
+        setTimeout(() => get().applyQualityFilter(), 0);
+      },
+
+      applyQualityFilter: () => {
+        const { feedbacks, pendingPhotos, qualityFilter } = get();
+        let resultFeedbacks = [...feedbacks];
+        let resultPending = [...pendingPhotos];
+
+        if (qualityFilter.clinicId) {
+          resultFeedbacks = resultFeedbacks.filter((fb) => fb.assigneeClinicId === qualityFilter.clinicId);
+          resultPending = resultPending.filter((item) => {
+            const caseItem = mockCases.find((c) => c.id === item.caseId);
+            return caseItem?.clinicId === qualityFilter.clinicId;
+          });
+        }
+
+        if (qualityFilter.doctorId) {
+          resultFeedbacks = resultFeedbacks.filter((fb) => {
+            const caseItem = mockCases.find((c) => c.id === fb.caseId);
+            return caseItem?.doctorId === qualityFilter.doctorId;
+          });
+          resultPending = resultPending.filter((item) => {
+            const caseItem = mockCases.find((c) => c.id === item.caseId);
+            return caseItem?.doctorId === qualityFilter.doctorId;
+          });
+        }
+
+        if (qualityFilter.nurseId) {
+          resultFeedbacks = resultFeedbacks.filter((fb) => {
+            const caseItem = mockCases.find((c) => c.id === fb.caseId);
+            if (!caseItem) return false;
+            return caseItem.visits.some((v) => v.nurseId === qualityFilter.nurseId);
+          });
+          resultPending = resultPending.filter((item) => {
+            const caseItem = mockCases.find((c) => c.id === item.caseId);
+            if (!caseItem) return false;
+            return caseItem.visits.some((v) => v.nurseId === qualityFilter.nurseId);
+          });
+        }
+
+        if (qualityFilter.missingAngle) {
+          resultPending = resultPending.filter((item) => {
+            const caseItem = mockCases.find((c) => c.id === item.caseId);
+            if (!caseItem) return false;
+            return caseItem.visits.some((v) => v.missingAngles.includes(qualityFilter.missingAngle!));
+          });
+        }
+
+        if (qualityFilter.status) {
+          resultFeedbacks = resultFeedbacks.filter((fb) => fb.status === qualityFilter.status);
+        }
+
+        set({
+          filteredFeedbacks: resultFeedbacks,
+          filteredPendingPhotos: resultPending,
+        });
+      },
+
+      resetQualityFilter: () => {
+        set({ qualityFilter: initialFilter });
+        setTimeout(() => get().applyQualityFilter(), 0);
+      },
+
+      setReviewSource: (source: ReviewSource | null) => {
+        set({ reviewSource: source });
+        if (source) {
+          get().applyReviewSourceFilter();
+        }
+      },
+
+      applyReviewSourceFilter: () => {
+        const { reviewSource } = get();
+        if (!reviewSource) return;
+
+        set({
+          qualityFilter: {
+            clinicId: reviewSource.clinicId,
+            doctorId: reviewSource.doctorId ?? null,
+            nurseId: reviewSource.nurseId ?? null,
+            missingAngle: null,
+            status: null,
+          },
+        });
+        setTimeout(() => get().applyQualityFilter(), 0);
+      },
+
+      clearReviewSource: () => {
+        set({ reviewSource: null });
+        get().resetQualityFilter();
       },
     }),
     {
@@ -228,6 +348,8 @@ export const useQualityStore = create<QualityState>()(
       partialize: (state) => ({
         feedbacks: state.feedbacks,
         selectedPendingIndex: state.selectedPendingIndex,
+        qualityFilter: state.qualityFilter,
+        reviewSource: state.reviewSource,
       }),
     }
   )

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { CheckCircle2, XCircle, Clock, AlertTriangle, Eye } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, AlertTriangle, Eye, X, Info } from 'lucide-react';
 import { useQualityStore } from '@/store/useQualityStore';
 import { mockCases } from '@/mock/cases';
 import type { FeedbackStatus, QualityFeedback, IssueType } from '@/types';
@@ -45,13 +45,22 @@ interface FeedbackWithMeta extends QualityFeedback {
 }
 
 export default function FeedbackStatusTracker() {
-  const { feedbacks, updateFeedbackStatus, highlightedFeedbackIds, selectedFeedbackId } = useQualityStore();
+  const { filteredFeedbacks, feedbacks, updateFeedbackStatus, highlightedFeedbackIds, selectedFeedbackId, reviewSource, clearReviewSource, qualityFilter } = useQualityStore();
   const [activeTab, setActiveTab] = useState<TabKey>('all');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef<Map<string, HTMLTableRowElement>>(new Map());
 
+  const hasActiveFilter =
+    qualityFilter.clinicId ||
+    qualityFilter.doctorId ||
+    qualityFilter.nurseId ||
+    qualityFilter.missingAngle ||
+    qualityFilter.status;
+
+  const sourceFeedbacks = hasActiveFilter ? filteredFeedbacks : feedbacks;
+
   const feedbacksWithMeta = useMemo<FeedbackWithMeta[]>(() => {
-    return feedbacks.map((fb) => {
+    return sourceFeedbacks.map((fb) => {
       const caseItem = mockCases.find((c) => c.id === fb.caseId);
       let thumbUrl: string | undefined;
       let angleLabel: string | undefined;
@@ -75,9 +84,9 @@ export default function FeedbackStatusTracker() {
         angleLabel,
       };
     });
-  }, [feedbacks]);
+  }, [sourceFeedbacks]);
 
-  const filteredFeedbacks = useMemo(() => {
+  const filteredFeedbacksDisplay = useMemo(() => {
     if (activeTab === 'all') return feedbacksWithMeta;
     return feedbacksWithMeta.filter((fb) => fb.status === activeTab);
   }, [feedbacksWithMeta, activeTab]);
@@ -111,8 +120,36 @@ export default function FeedbackStatusTracker() {
     }
   }, [highlightedFeedbackIds, selectedFeedbackId]);
 
+  const getReviewSourceText = () => {
+    if (!reviewSource) return '';
+    const parts = [reviewSource.clinicName];
+    if (reviewSource.doctorName) parts.push(reviewSource.doctorName);
+    if (reviewSource.nurseName) parts.push(reviewSource.nurseName);
+    return parts.join(' · ');
+  };
+
   return (
     <div className="flex h-full flex-col bg-white">
+      {reviewSource && (
+        <div className="border-b border-blue-200 bg-blue-50 px-6 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm text-blue-700">
+              <Info className="h-4 w-4 flex-shrink-0" />
+              <span>
+                来自门店复盘：<span className="font-semibold">{getReviewSourceText()}</span>
+              </span>
+            </div>
+            <button
+              onClick={clearReviewSource}
+              className="inline-flex items-center gap-1 rounded-md bg-white px-3 py-1 text-xs font-medium text-blue-600 shadow-sm ring-1 ring-blue-200 transition-colors hover:bg-blue-50"
+            >
+              <X className="h-3 w-3" />
+              清除筛选
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="border-b border-slate-200 px-6 pt-4">
         <div className="flex items-center gap-1">
           {TABS.map((tab) => {
@@ -146,7 +183,7 @@ export default function FeedbackStatusTracker() {
       </div>
 
       <div ref={scrollContainerRef} className="flex-1 overflow-auto">
-        {filteredFeedbacks.length === 0 ? (
+        {filteredFeedbacksDisplay.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-slate-400">
             {activeTab === 'pending' ? (
               <CheckCircle2 className="h-12 w-12 text-green-300" />
@@ -185,7 +222,7 @@ export default function FeedbackStatusTracker() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
-              {filteredFeedbacks.map((fb) => {
+              {filteredFeedbacksDisplay.map((fb) => {
                 const statusConfig = FEEDBACK_STATUS.find((s) => s.key === fb.status);
                 const issueConfig = ISSUE_TYPES.find((t) => t.key === fb.issueMark.type);
                 const IssueIcon = issueConfig?.icon;

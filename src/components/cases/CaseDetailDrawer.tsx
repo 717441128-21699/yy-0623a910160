@@ -18,7 +18,7 @@ import { TREATMENT_STAGES } from '@/utils/constants';
 import { cn } from '@/lib/utils';
 
 export default function CaseDetailDrawer() {
-  const { selectedCaseId, cases, selectCase } = useCaseStore();
+  const { selectedCaseId, cases, selectCase, filter } = useCaseStore();
   const { getFeedbacksByCase, addHighlights, selectFeedback } = useQualityStore();
   const navigate = useNavigate();
   const selectedCase = cases.find((c) => c.id === selectedCaseId) || null;
@@ -179,7 +179,7 @@ export default function CaseDetailDrawer() {
             </div>
           )}
 
-          <VisitTimeline visits={selectedCase.visits} caseId={selectedCase.id} />
+          <VisitTimeline visits={selectedCase.visits} caseId={selectedCase.id} filter={filter} />
         </div>
 
         <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 shrink-0">

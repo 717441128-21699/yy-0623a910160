@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { OrthoCase, CaseFilter } from '../types';
+import type { OrthoCase, CaseFilter, ReviewSource } from '../types';
 import { mockCases } from '../mock/cases';
 
 interface CaseState {
@@ -8,10 +8,14 @@ interface CaseState {
   filteredCases: OrthoCase[];
   selectedCaseId: string | null;
   filter: CaseFilter;
+  reviewSource: ReviewSource | null;
   setFilter: (partialFilter: Partial<CaseFilter>) => void;
   applyFilter: () => void;
   selectCase: (id: string | null) => void;
   loadCases: () => void;
+  setReviewSource: (source: ReviewSource | null) => void;
+  clearReviewSource: () => void;
+  resetFilter: () => void;
 }
 
 const initialFilter: CaseFilter = {
@@ -30,11 +34,25 @@ export const useCaseStore = create<CaseState>()(
       filteredCases: [],
       selectedCaseId: null,
       filter: initialFilter,
+      reviewSource: null,
 
       setFilter: (partialFilter: Partial<CaseFilter>) => {
         set((state) => ({
           filter: { ...state.filter, ...partialFilter },
         }));
+      },
+
+      resetFilter: () => {
+        set({ filter: initialFilter });
+        setTimeout(() => get().applyFilter(), 0);
+      },
+
+      setReviewSource: (source: ReviewSource | null) => {
+        set({ reviewSource: source });
+      },
+
+      clearReviewSource: () => {
+        set({ reviewSource: null });
       },
 
       applyFilter: () => {
@@ -102,6 +120,7 @@ export const useCaseStore = create<CaseState>()(
       partialize: (state) => ({
         filter: state.filter,
         filteredCases: state.filteredCases,
+        reviewSource: state.reviewSource,
       }),
     }
   )

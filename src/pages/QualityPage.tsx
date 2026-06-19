@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'react';
-import { ImageIcon, ClipboardList, ShieldCheck } from 'lucide-react';
+import { ImageIcon, ClipboardList, ShieldCheck, BellRing } from 'lucide-react';
 import { useQualityStore } from '@/store/useQualityStore';
 import PendingFeedbackList from '@/components/quality/PendingFeedbackList';
 import PhotoAnnotation from '@/components/quality/PhotoAnnotation';
 import IssueSidebar from '@/components/quality/IssueSidebar';
 import FeedbackForm from '@/components/quality/FeedbackForm';
 import FeedbackStatusTracker from '@/components/quality/FeedbackStatusTracker';
+import NurseReminderView from '@/components/quality/NurseReminderView';
 import type { IssueType, IssueMark } from '@/types';
 import { ISSUE_TYPES } from '@/utils/constants';
 import { cn } from '@/lib/utils';
 
-type PageTab = 'pending' | 'tracker';
+type PageTab = 'pending' | 'tracker' | 'nurse';
 
 export default function QualityPage() {
   const {
@@ -106,6 +107,18 @@ export default function QualityPage() {
               <ClipboardList className="h-4 w-4" />
               整改追踪
             </button>
+            <button
+              onClick={() => setActiveTab('nurse')}
+              className={cn(
+                'flex items-center gap-2 rounded-md px-4 py-1.5 text-sm font-medium transition-all',
+                activeTab === 'nurse'
+                  ? 'bg-white text-slate-800 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              )}
+            >
+              <BellRing className="h-4 w-4" />
+              护士提醒
+            </button>
           </div>
         </div>
       </header>
@@ -142,9 +155,13 @@ export default function QualityPage() {
               </div>
             </div>
           </div>
-        ) : (
+        ) : activeTab === 'tracker' ? (
           <div className="h-full overflow-hidden">
             <FeedbackStatusTracker />
+          </div>
+        ) : (
+          <div className="h-full overflow-hidden">
+            <NurseReminderView />
           </div>
         )}
       </main>

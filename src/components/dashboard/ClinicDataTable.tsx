@@ -10,7 +10,7 @@ const getCompletionRateColor = (rate: number): string => {
 };
 
 const ClinicDataTable: React.FC = () => {
-  const { dailyData } = useDashboardStore();
+  const { dailyData, selectClinic } = useDashboardStore();
 
   return (
     <div className="bg-white rounded-2xl shadow-card border border-slate-100 overflow-hidden">
@@ -82,6 +82,7 @@ const ClinicDataTable: React.FC = () => {
                   <td className="px-6 py-4 text-center whitespace-nowrap">
                     <button
                       type="button"
+                      onClick={() => selectClinic(row.clinicId)}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary-600 bg-primary-50 rounded-lg hover:bg-primary-100 transition-colors"
                     >
                       <Eye className="w-4 h-4" />

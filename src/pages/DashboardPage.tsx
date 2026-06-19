@@ -6,6 +6,7 @@ import KPICards from '../components/dashboard/KPICards';
 import ClinicDataTable from '../components/dashboard/ClinicDataTable';
 import TrendChart from '../components/dashboard/TrendChart';
 import MissingAnglePie from '../components/dashboard/MissingAnglePie';
+import ClinicDetailDrawer from '../components/dashboard/ClinicDetailDrawer';
 
 const DashboardPage: React.FC = () => {
   const {
@@ -210,6 +211,7 @@ const DashboardPage: React.FC = () => {
           </div>
         </div>
       </div>
+      <ClinicDetailDrawer />
     </div>
   );
 };

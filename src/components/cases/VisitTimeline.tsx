@@ -1,13 +1,22 @@
 import { useState } from 'react';
-import type { FollowUpVisit } from '@/types';
+import type { FollowUpVisit, QualityFeedback } from '@/types';
 import PhotoGrid from './PhotoGrid';
 import { PHOTO_ANGLE_LABELS } from '@/mock/cases';
+import { useQualityStore } from '@/store/useQualityStore';
 import { TREATMENT_STAGES } from '@/utils/constants';
-import { Stethoscope, UserRound, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
+import {
+  Stethoscope,
+  UserRound,
+  ChevronDown,
+  ChevronUp,
+  AlertTriangle,
+  ClipboardCheck,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface VisitTimelineProps {
   visits: FollowUpVisit[];
+  caseId: string;
 }
 
 const STAGE_DOT_COLORS: Record<string, string> = {
@@ -18,7 +27,24 @@ const STAGE_DOT_COLORS: Record<string, string> = {
   retention: 'bg-emerald-500',
 };
 
-export default function VisitTimeline({ visits }: VisitTimelineProps) {
+const ISSUE_TYPE_COLORS: Record<string, string> = {
+  blur: 'bg-purple-500',
+  hookPosition: 'bg-orange-500',
+  biteIncorrect: 'bg-red-500',
+  incomplete: 'bg-pink-500',
+  lighting: 'bg-yellow-500',
+  other: 'bg-slate-500',
+};
+
+const FEEDBACK_STATUS_COLORS: Record<string, string> = {
+  pending: 'bg-warning-100 text-warning-700',
+  fixed: 'bg-primary-100 text-primary-700',
+  verified: 'bg-secondary-100 text-secondary-700',
+  rejected: 'bg-danger-100 text-danger-700',
+};
+
+export default function VisitTimeline({ visits, caseId }: VisitTimelineProps) {
+  const { feedbacks } = useQualityStore();
   const sortedVisits = [...visits].reverse();
   const [expandedId, setExpandedId] = useState<string | null>(
     sortedVisits.length > 0 ? sortedVisits[0].id : null
@@ -26,6 +52,22 @@ export default function VisitTimeline({ visits }: VisitTimelineProps) {
 
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
+  };
+
+  const getVisitFeedbacks = (visitId: string): QualityFeedback[] => {
+    return feedbacks.filter(
+      (fb) => fb.caseId === caseId && fb.visitId === visitId
+    );
+  };
+
+  const getFeedbackStats = (visitId: string) => {
+    const visitFeedbacks = getVisitFeedbacks(visitId);
+    return {
+      total: visitFeedbacks.length,
+      pending: visitFeedbacks.filter((fb) => fb.status === 'pending').length,
+      fixed: visitFeedbacks.filter((fb) => fb.status === 'fixed').length,
+      verified: visitFeedbacks.filter((fb) => fb.status === 'verified').length,
+    };
   };
 
   return (
@@ -38,6 +80,8 @@ export default function VisitTimeline({ visits }: VisitTimelineProps) {
           const stageConfig = TREATMENT_STAGES.find((s) => s.key === visit.stage);
           const isLatest = index === 0;
           const hasMissingAngles = visit.missingAngles.length > 0;
+          const stats = getFeedbackStats(visit.id);
+          const visitFeedbacks = getVisitFeedbacks(visit.id);
 
           return (
             <div key={visit.id} className="relative pl-12">
@@ -74,6 +118,22 @@ export default function VisitTimeline({ visits }: VisitTimelineProps) {
                         <span className={cn('badge text-[11px]', stageConfig.color)}>
                           {visit.stageLabel}
                         </span>
+                      )}
+                      {stats.total > 0 && (
+                        <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1 px-2 py-0.5 bg-warning-100 text-warning-700 rounded-full text-[11px] font-medium">
+                            <AlertTriangle className="w-3 h-3" />
+                            {stats.pending}
+                          </div>
+                          <div className="flex items-center gap-1 px-2 py-0.5 bg-primary-100 text-primary-700 rounded-full text-[11px] font-medium">
+                            <ClipboardCheck className="w-3 h-3" />
+                            {stats.fixed}
+                          </div>
+                          <div className="flex items-center gap-1 px-2 py-0.5 bg-secondary-100 text-secondary-700 rounded-full text-[11px] font-medium">
+                            <ClipboardCheck className="w-3 h-3" />
+                            {stats.verified}
+                          </div>
+                        </div>
                       )}
                     </div>
                     <button className="p-1 hover:bg-slate-100 rounded-lg transition-colors">
@@ -115,12 +175,80 @@ export default function VisitTimeline({ visits }: VisitTimelineProps) {
                 {isExpanded && (
                   <div className="px-5 pb-5 border-t border-slate-100 pt-5 animate-fadeIn">
                     <div className="mb-5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <ClipboardCheck className="w-4 h-4 text-primary-600" />
+                        <h4 className="text-sm font-semibold text-slate-700">
+                          质控点评
+                        </h4>
+                      </div>
+                      {visitFeedbacks.length === 0 ? (
+                        <div className="p-4 bg-slate-50 rounded-xl text-center text-sm text-slate-500">
+                          暂无质控反馈
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {visitFeedbacks.map((fb) => {
+                            const photo = visit.photos.find((p) => p.id === fb.photoId);
+                            return (
+                              <div
+                                key={fb.id}
+                                className="flex gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100"
+                              >
+                                {photo ? (
+                                  <img
+                                    src={photo.thumbUrl}
+                                    alt={photo.angleLabel}
+                                    className="w-16 h-12 rounded-lg object-cover shrink-0"
+                                  />
+                                ) : (
+                                  <div className="w-16 h-12 rounded-lg bg-slate-200 shrink-0 flex items-center justify-center">
+                                    <ClipboardCheck className="w-4 h-4 text-slate-400" />
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                                    <div className="flex items-center gap-2 flex-wrap min-w-0">
+                                      <span className="text-xs font-medium text-slate-500 shrink-0">
+                                        {photo?.angleLabel || '未知角度'}
+                                      </span>
+                                      <span
+                                        className={cn(
+                                          'badge text-[10px] text-white',
+                                          ISSUE_TYPE_COLORS[fb.issueMark.type] || 'bg-slate-500'
+                                        )}
+                                      >
+                                        {fb.issueMark.typeLabel}
+                                      </span>
+                                    </div>
+                                    <span
+                                      className={cn(
+                                        'badge text-[10px] shrink-0',
+                                        FEEDBACK_STATUS_COLORS[fb.status]
+                                      )}
+                                    >
+                                      {fb.statusLabel}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">
+                                    {fb.suggestion}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mb-5">
                       <h4 className="text-sm font-semibold text-slate-700 mb-3">
                         复诊照片
                       </h4>
                       <PhotoGrid
                         photos={visit.photos}
                         missingAngles={visit.missingAngles}
+                        visitId={visit.id}
+                        caseId={caseId}
                       />
                     </div>
 

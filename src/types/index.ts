@@ -166,3 +166,27 @@ export interface CurrentAnnotation {
   photoId: string | null;
   marks: IssueMark[];
 }
+
+export interface ClinicDetailTrendPoint {
+  date: string;
+  retakeRate: number;
+  retakeCount: number;
+}
+
+export interface ClinicMissingAngleRank {
+  angle: PhotoAngle;
+  count: number;
+  label: string;
+}
+
+export interface ClinicInvolvedPerson {
+  name: string;
+  role: 'doctor' | 'nurse';
+  missingCount: number;
+}
+
+export interface ClinicDetailData {
+  trend14Days: ClinicDetailTrendPoint[];
+  missingAngleRanking: ClinicMissingAngleRank[];
+  involvedPeople: ClinicInvolvedPerson[];
+}

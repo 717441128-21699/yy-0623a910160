@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useCaseStore } from '@/store/useCaseStore';
+import { useQualityStore } from '@/store/useQualityStore';
 import VisitTimeline from './VisitTimeline';
 import {
   X,
@@ -7,12 +8,16 @@ import {
   Calendar,
   FileCheck,
   User,
+  ClipboardCheck,
+  AlertTriangle,
+  ShieldCheck,
 } from 'lucide-react';
 import { TREATMENT_STAGES } from '@/utils/constants';
 import { cn } from '@/lib/utils';
 
 export default function CaseDetailDrawer() {
   const { selectedCaseId, cases, selectCase } = useCaseStore();
+  const { feedbacks } = useQualityStore();
   const selectedCase = cases.find((c) => c.id === selectedCaseId) || null;
 
   const isOpen = !!selectedCase;
@@ -37,6 +42,11 @@ export default function CaseDetailDrawer() {
   }, [selectCase]);
 
   if (!selectedCase) return null;
+
+  const caseFeedbacks = feedbacks.filter((fb) => fb.caseId === selectedCase.id);
+  const totalFeedbacks = caseFeedbacks.length;
+  const pendingCount = caseFeedbacks.filter((fb) => fb.status === 'pending').length;
+  const verifiedCount = caseFeedbacks.filter((fb) => fb.status === 'verified').length;
 
   const stageConfig = TREATMENT_STAGES.find((s) => s.key === selectedCase.currentStage);
   const avatarColor = selectedCase.patient.gender === 'male'
@@ -104,7 +114,39 @@ export default function CaseDetailDrawer() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
-          <VisitTimeline visits={selectedCase.visits} />
+          {totalFeedbacks > 0 && (
+            <div className="mb-6 p-4 bg-gradient-to-r from-slate-50 to-primary-50/30 rounded-2xl border border-slate-100">
+              <div className="flex items-center gap-2 mb-3">
+                <ClipboardCheck className="w-4 h-4 text-primary-600" />
+                <h3 className="text-sm font-semibold text-slate-700">质控总览</h3>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="p-3 bg-white rounded-xl shadow-sm border border-slate-100 text-center">
+                  <div className="flex items-center justify-center gap-1 mb-1">
+                    <ClipboardCheck className="w-3.5 h-3.5 text-slate-500" />
+                    <span className="text-[11px] text-slate-500 font-medium">累计反馈</span>
+                  </div>
+                  <p className="text-2xl font-bold text-slate-800">{totalFeedbacks}</p>
+                </div>
+                <div className="p-3 bg-white rounded-xl shadow-sm border border-warning-100 text-center">
+                  <div className="flex items-center justify-center gap-1 mb-1">
+                    <AlertTriangle className="w-3.5 h-3.5 text-warning-600" />
+                    <span className="text-[11px] text-warning-600 font-medium">待整改</span>
+                  </div>
+                  <p className="text-2xl font-bold text-warning-600">{pendingCount}</p>
+                </div>
+                <div className="p-3 bg-white rounded-xl shadow-sm border border-secondary-100 text-center">
+                  <div className="flex items-center justify-center gap-1 mb-1">
+                    <ShieldCheck className="w-3.5 h-3.5 text-secondary-600" />
+                    <span className="text-[11px] text-secondary-600 font-medium">已验证</span>
+                  </div>
+                  <p className="text-2xl font-bold text-secondary-600">{verifiedCount}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <VisitTimeline visits={selectedCase.visits} caseId={selectedCase.id} />
         </div>
 
         <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 shrink-0">

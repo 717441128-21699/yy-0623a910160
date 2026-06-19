@@ -146,4 +146,48 @@
   .divider {
     @apply h-px bg-slate-200 my-4;
   }
+
+  .fade-highlight {
+    animation: fadeHighlight 2s ease-out forwards;
+  }
+
+  @keyframes fadeHighlight {
+    0% {
+      background-color: rgb(254 249 195);
+    }
+    70% {
+      background-color: rgb(254 249 195);
+    }
+    100% {
+      background-color: transparent;
+    }
+  }
+
+  .modal-overlay {
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  .modal-content {
+    animation: scaleIn 0.2s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
 }

@@ -6,6 +6,12 @@ import { mockCases, nurseNames } from '@/mock/cases';
 import { cn } from '@/lib/utils';
 import { ISSUE_TYPES } from '@/utils/constants';
 import type { QualityFeedback } from '@/types';
+import FeedbackDetailDrawer from './FeedbackDetailDrawer';
+
+interface NurseReminderViewProps {
+  onViewTracker: () => void;
+  onViewCase: (caseId: string) => void;
+}
 
 interface ExtendedFeedback extends QualityFeedback {
   patientName: string;
@@ -68,10 +74,11 @@ function getAvatarColor(name: string): string {
   return colors[Math.abs(hash) % colors.length];
 }
 
-export default function NurseReminderView() {
+export default function NurseReminderView({ onViewTracker, onViewCase }: NurseReminderViewProps) {
   const { feedbacks } = useQualityStore();
   const [selectedClinicId, setSelectedClinicId] = useState<string>('all');
   const [selectedNurse, setSelectedNurse] = useState<string>('all');
+  const [selectedFeedbackId, setSelectedFeedbackId] = useState<string | null>(null);
 
   const extendedFeedbacks = useMemo<ExtendedFeedback[]>(() => {
     return feedbacks
@@ -266,14 +273,15 @@ export default function NurseReminderView() {
                     return (
                       <div
                         key={fb.id}
-                        className="flex gap-3 p-4 transition-colors hover:bg-slate-50/50"
+                        onClick={() => setSelectedFeedbackId(fb.id)}
+                        className="flex gap-3 p-4 cursor-pointer transition-all duration-200 hover:bg-blue-50/50 group/item relative"
                       >
                         <div className="relative h-16 w-20 flex-shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
                           {fb.thumbUrl && (
                             <img
                               src={fb.thumbUrl}
                               alt={fb.patientName}
-                              className="h-full w-full object-cover"
+                              className="h-full w-full object-cover transition-transform duration-300 group-hover/item:scale-105"
                             />
                           )}
                         </div>
@@ -281,7 +289,7 @@ export default function NurseReminderView() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
-                              <p className="truncate text-sm font-medium text-slate-800">
+                              <p className="truncate text-sm font-medium text-slate-800 group-hover/item:text-blue-700 transition-colors">
                                 {fb.patientName}
                               </p>
                               <div className="mt-1 flex flex-wrap items-center gap-1.5">
@@ -298,11 +306,14 @@ export default function NurseReminderView() {
                                 </span>
                               </div>
                             </div>
-                            {overdue && (
-                              <span className="flex-shrink-0 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-600">
-                                超期
-                              </span>
-                            )}
+                            <div className="flex flex-col items-end gap-1">
+                              {overdue && (
+                                <span className="flex-shrink-0 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-600">
+                                  超期
+                                </span>
+                              )}
+                              <ChevronRight className="h-4 w-4 text-slate-300 opacity-0 group-hover/item:opacity-100 group-hover/item:text-blue-500 transition-all" />
+                            </div>
                           </div>
 
                           <p className="mt-1 text-[11px] text-slate-400">
@@ -332,7 +343,10 @@ export default function NurseReminderView() {
                 </div>
 
                 <div className="border-t border-slate-100 bg-slate-50/50 p-3">
-                  <button className="group/btn flex w-full items-center justify-center gap-1 rounded-lg py-2 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-50">
+                  <button
+                    onClick={() => group.feedbacks.length > 0 && setSelectedFeedbackId(group.feedbacks[0].id)}
+                    className="group/btn flex w-full items-center justify-center gap-1 rounded-lg py-2 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-100/60"
+                  >
                     <span>查看完整质控详情</span>
                     <ChevronRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-0.5" />
                   </button>
@@ -342,6 +356,13 @@ export default function NurseReminderView() {
           </div>
         )}
       </div>
+
+      <FeedbackDetailDrawer
+        feedbackId={selectedFeedbackId}
+        onClose={() => setSelectedFeedbackId(null)}
+        onViewTracker={onViewTracker}
+        onViewCase={onViewCase}
+      />
     </div>
   );
 }

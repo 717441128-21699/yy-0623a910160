@@ -1,6 +1,8 @@
 import { useCaseStore } from '@/store/useCaseStore';
 import { doctorNames, nurseNames } from '@/mock/cases';
-import type { TreatmentStage } from '@/types';
+import { mockClinics } from '@/mock/clinics';
+import { PHOTO_ANGLE_LABELS } from '@/mock/dashboardStats';
+import type { TreatmentStage, PhotoAngle } from '@/types';
 import { RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -18,6 +20,16 @@ export default function CaseFilterBar() {
 
   const handleStageChange = (key: 'all' | TreatmentStage) => {
     setFilter({ stage: key === 'all' ? null : key });
+    setTimeout(applyFilter, 0);
+  };
+
+  const handleClinicChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setFilter({ clinicId: e.target.value || null });
+    setTimeout(applyFilter, 0);
+  };
+
+  const handleMissingAngleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setFilter({ missingAngle: (e.target.value as PhotoAngle) || null });
     setTimeout(applyFilter, 0);
   };
 
@@ -51,9 +63,11 @@ export default function CaseFilterBar() {
 
   const handleReset = () => {
     setFilter({
+      clinicId: null,
       doctorId: null,
       nurseId: null,
       stage: null,
+      missingAngle: null,
       dateRange: null,
     });
     setTimeout(applyFilter, 0);
@@ -62,6 +76,22 @@ export default function CaseFilterBar() {
   return (
     <div className="card">
       <div className="flex flex-wrap items-center gap-4">
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-slate-700 whitespace-nowrap">门店</label>
+          <select
+            className="input-field !py-2 !text-sm min-w-[180px]"
+            value={filter.clinicId || ''}
+            onChange={handleClinicChange}
+          >
+            <option value="">全部门店</option>
+            {mockClinics.map((clinic) => (
+              <option key={clinic.id} value={clinic.id}>
+                {clinic.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div className="flex items-center gap-2">
           <label className="text-sm font-medium text-slate-700 whitespace-nowrap">医生</label>
           <select
@@ -89,6 +119,22 @@ export default function CaseFilterBar() {
             {nurseNames.map((nurse) => (
               <option key={nurse.id} value={nurse.id}>
                 {nurse.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-slate-700 whitespace-nowrap">缺失角度</label>
+          <select
+            className="input-field !py-2 !text-sm min-w-[160px]"
+            value={filter.missingAngle || ''}
+            onChange={handleMissingAngleChange}
+          >
+            <option value="">全部角度</option>
+            {Object.entries(PHOTO_ANGLE_LABELS).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
               </option>
             ))}
           </select>

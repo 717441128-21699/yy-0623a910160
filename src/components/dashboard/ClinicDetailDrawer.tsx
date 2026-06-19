@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   X,
@@ -24,8 +24,11 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import useDashboardStore from '@/store/useDashboardStore';
+import useCaseStore from '@/store/useCaseStore';
 import { mockClinics } from '@/mock/clinics';
+import { doctorNames, nurseNames } from '@/mock/cases';
 import { cn } from '@/lib/utils';
+import type { PhotoAngle, ClinicInvolvedPerson } from '@/types';
 
 const ANGLE_COLORS = [
   '#ef4444',
@@ -38,11 +41,19 @@ const ANGLE_COLORS = [
   '#84cc16',
 ];
 
+const TIME_RANGES = [
+  { days: 7, label: '近7天' },
+  { days: 14, label: '近14天' },
+  { days: 30, label: '近30天' },
+];
+
 export default function ClinicDetailDrawer() {
   const navigate = useNavigate();
-  const { selectedClinicId, clinicDetailData, dailyData, selectClinic } = useDashboardStore();
+  const { selectedClinicId, clinicDetailData, dailyData, selectClinic, trendDays, setTrendDays } = useDashboardStore();
+  const { setFilter: setCaseFilter, applyFilter: applyCaseFilter } = useCaseStore();
   const selectedClinic = mockClinics.find((c) => c.id === selectedClinicId) || null;
   const clinicDailyData = dailyData.find((d) => d.clinicId === selectedClinicId) || null;
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   const isOpen = !!selectedClinic;
 
@@ -103,7 +114,59 @@ export default function ClinicDetailDrawer() {
     return colors[name.charCodeAt(0) % colors.length];
   };
 
+  const handleTimeRangeChange = (days: number) => {
+    if (days === trendDays) return;
+    setIsTransitioning(true);
+    setTrendDays(days);
+    setTimeout(() => setIsTransitioning(false), 300);
+  };
+
+  const handleAngleClick = (angle: PhotoAngle) => {
+    if (!selectedClinicId) return;
+    setCaseFilter({
+      clinicId: selectedClinicId,
+      missingAngle: angle,
+      doctorId: null,
+      nurseId: null,
+      stage: null,
+      dateRange: null,
+    });
+    setTimeout(applyCaseFilter, 0);
+    selectClinic(null);
+    navigate('/cases');
+  };
+
+  const handlePersonClick = (person: ClinicInvolvedPerson) => {
+    if (!selectedClinicId) return;
+    const personList = person.role === 'doctor' ? doctorNames : nurseNames;
+    const foundPerson = personList.find((p) => p.name === person.name);
+    const idKey = person.role === 'doctor' ? 'doctorId' : 'nurseId';
+
+    setCaseFilter({
+      clinicId: selectedClinicId,
+      missingAngle: null,
+      doctorId: person.role === 'doctor' && foundPerson ? foundPerson.id : null,
+      nurseId: person.role === 'nurse' && foundPerson ? foundPerson.id : null,
+      stage: null,
+      dateRange: null,
+    });
+    setTimeout(applyCaseFilter, 0);
+    selectClinic(null);
+    navigate('/cases');
+  };
+
   const handleCheckCases = () => {
+    if (!selectedClinicId) return;
+    setCaseFilter({
+      clinicId: selectedClinicId,
+      missingAngle: null,
+      doctorId: null,
+      nurseId: null,
+      stage: null,
+      dateRange: null,
+    });
+    setTimeout(applyCaseFilter, 0);
+    selectClinic(null);
     navigate('/cases');
   };
 
@@ -150,6 +213,34 @@ export default function ClinicDetailDrawer() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          <div className="flex items-center justify-center">
+            <div className="inline-flex items-center bg-slate-100 rounded-full p-1">
+              {TIME_RANGES.map((range) => {
+                const isActive = trendDays === range.days;
+                return (
+                  <button
+                    key={range.days}
+                    onClick={() => handleTimeRangeChange(range.days)}
+                    className={cn(
+                      'px-5 py-1.5 text-sm font-medium rounded-full transition-all duration-200',
+                      isActive
+                        ? 'bg-slate-800 text-white shadow-sm'
+                        : 'text-slate-600 hover:text-slate-800'
+                    )}
+                  >
+                    {range.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div
+            className={cn(
+              'transition-opacity duration-300',
+              isTransitioning ? 'opacity-0' : 'opacity-100'
+            )}
+          >
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="relative bg-white rounded-xl shadow-card border border-slate-100 p-4 overflow-hidden">
               <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary-500" />
@@ -217,12 +308,16 @@ export default function ClinicDetailDrawer() {
               <h3 className="text-base font-semibold text-slate-800">最常漏拍角度 TOP5</h3>
               <p className="text-sm text-slate-500 mt-1">按缺失次数从高到低排列</p>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-3">
               {clinicDetailData.missingAngleRanking.slice(0, 5).map((item, idx) => {
                 const percentage = (item.count / maxAngleCount) * 100;
                 const color = ANGLE_COLORS[idx % ANGLE_COLORS.length];
                 return (
-                  <div key={item.angle} className="space-y-2">
+                  <div
+                    key={item.angle}
+                    onClick={() => handleAngleClick(item.angle)}
+                    className="space-y-2 p-3 -mx-3 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors duration-200"
+                  >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
                         <span
@@ -257,11 +352,12 @@ export default function ClinicDetailDrawer() {
               <h3 className="text-base font-semibold text-slate-800">涉及人员分析</h3>
               <p className="text-sm text-slate-500 mt-1">缺失照片较多的医生和护士</p>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-2">
               {clinicDetailData.involvedPeople.map((person, idx) => (
                 <div
                   key={`${person.name}-${idx}`}
-                  className="flex items-center gap-4 p-3 rounded-xl bg-slate-50/50 hover:bg-slate-50 transition-colors"
+                  onClick={() => handlePersonClick(person)}
+                  className="flex items-center gap-4 p-3 rounded-xl bg-slate-50/50 hover:bg-slate-100 cursor-pointer transition-colors duration-200"
                 >
                   <div
                     className={cn(
@@ -299,13 +395,13 @@ export default function ClinicDetailDrawer() {
 
           <div className="bg-white rounded-2xl shadow-card border border-slate-100 p-6">
             <div className="mb-5">
-              <h3 className="text-base font-semibold text-slate-800">近14天重拍趋势</h3>
+              <h3 className="text-base font-semibold text-slate-800">近{clinicDetailData.trendDays}天重拍趋势</h3>
               <p className="text-sm text-slate-500 mt-1">每日重拍率与重拍数量变化</p>
             </div>
             <div style={{ height: 300 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart
-                  data={clinicDetailData.trend14Days}
+                  data={clinicDetailData.trendData}
                   margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
@@ -377,6 +473,7 @@ export default function ClinicDetailDrawer() {
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
+          </div>
           </div>
         </div>
 

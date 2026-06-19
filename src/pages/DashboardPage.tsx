@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, Building2, RefreshCw, ChevronDown, Check, X } from 'lucide-react';
 import useDashboardStore from '../store/useDashboardStore';
+import { useQualityStore } from '../store/useQualityStore';
 import { mockClinics } from '../mock/clinics';
 import KPICards from '../components/dashboard/KPICards';
 import ClinicDataTable from '../components/dashboard/ClinicDataTable';
@@ -17,6 +18,7 @@ const DashboardPage: React.FC = () => {
     setAllClinics,
     loadDashboardData,
   } = useDashboardStore();
+  const { loadInitialData } = useQualityStore();
 
   const [showClinicDropdown, setShowClinicDropdown] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -25,6 +27,10 @@ const DashboardPage: React.FC = () => {
   useEffect(() => {
     loadDashboardData();
   }, [loadDashboardData]);
+
+  useEffect(() => {
+    loadInitialData();
+  }, [loadInitialData]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useCaseStore } from '@/store/useCaseStore';
+import { useQualityStore } from '@/store/useQualityStore';
 import CaseFilterBar from '@/components/cases/CaseFilterBar';
 import CaseCard from '@/components/cases/CaseCard';
 import CaseDetailDrawer from '@/components/cases/CaseDetailDrawer';
@@ -15,6 +16,7 @@ export default function CasesPage() {
     applyFilter,
     cases,
   } = useCaseStore();
+  const { loadInitialData } = useQualityStore();
 
   useEffect(() => {
     if (cases.length === 0) {
@@ -23,6 +25,10 @@ export default function CasesPage() {
       applyFilter();
     }
   }, [applyFilter, cases.length, loadCases]);
+
+  useEffect(() => {
+    loadInitialData();
+  }, [loadInitialData]);
 
   const totalPages = Math.max(1, Math.ceil(filteredCases.length / PAGE_SIZE));
   const [currentPage, setCurrentPage] = useState(1);

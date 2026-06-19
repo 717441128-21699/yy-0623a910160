@@ -12,6 +12,7 @@ interface FeedbackFormProps {
   onUpdateMarkDescription: (markId: string, description: string) => void;
   onRemoveMark: (markId: string) => void;
   onCancel: () => void;
+  onSubmitSuccess?: (feedbackIds: string[], assignee: string) => void;
 }
 
 const TYPE_COLOR_CLASSES: Record<IssueType, string> = {
@@ -29,6 +30,7 @@ export default function FeedbackForm({
   onUpdateMarkDescription,
   onRemoveMark,
   onCancel,
+  onSubmitSuccess,
 }: FeedbackFormProps) {
   const { pendingPhotos, selectedPendingIndex, submitFeedback } = useQualityStore();
   const [suggestion, setSuggestion] = useState('');
@@ -53,10 +55,13 @@ export default function FeedbackForm({
     if (!canSubmit || isSubmitting) return;
     setIsSubmitting(true);
     try {
-      submitFeedback({
+      const newFeedbackIds = submitFeedback({
         suggestion: suggestion.trim(),
         assignee,
       });
+      if (newFeedbackIds.length > 0 && onSubmitSuccess) {
+        onSubmitSuccess(newFeedbackIds, assignee);
+      }
       setSuggestion('');
       setAssignee('');
     } finally {

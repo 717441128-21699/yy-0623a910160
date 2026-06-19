@@ -1,4 +1,4 @@
-import type { ClinicDailyData, TrendDataPoint, MissingAngle, PhotoAngle } from '../types';
+import type { ClinicDailyData, TrendDataPoint, MissingAngle, PhotoAngle, ClinicDetailData, ClinicDetailTrendPoint, ClinicMissingAngleRank, ClinicInvolvedPerson } from '../types';
 
 const PHOTO_ANGLE_LABELS: Record<PhotoAngle, string> = {
   frontal: '正面像',
@@ -87,6 +87,67 @@ export const generateMissingAngleDist = (dailyData: ClinicDailyData[]): MissingA
     });
   });
   return Object.values(dist).sort((a, b) => b.count - a.count);
+};
+
+export const generateClinicDetail = (clinicId: string, days: number): ClinicDetailData => {
+  const seed = parseInt(clinicId.replace(/\D/g, ''), 10) || 1;
+
+  const formatDate = (d: Date): string => {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+
+  const trendData: ClinicDetailTrendPoint[] = [];
+  const today = new Date();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const daySeed = i * 5 + seed * 3;
+    trendData.push({
+      date: formatDate(d),
+      retakeRate: 3 + (daySeed % 8) + Math.round(((daySeed * 2) % 100) / 100) / 10,
+      retakeCount: 2 + ((daySeed + 1) % 6),
+    });
+  }
+
+  const angles: PhotoAngle[] = ['lateral', 'upperOcclusal', 'lowerOcclusal', 'occlusion', 'overjet', 'overbite', 'frontalSmile', 'lateral45', 'frontal'];
+  const missingAngleRanking: ClinicMissingAngleRank[] = [];
+  const rankCount = Math.min(5 + (seed % 3), angles.length);
+  for (let i = 0; i < rankCount; i++) {
+    const angle = angles[(seed + i) % angles.length];
+    if (!missingAngleRanking.find((m) => m.angle === angle)) {
+      missingAngleRanking.push({
+        angle,
+        label: PHOTO_ANGLE_LABELS[angle],
+        count: Math.round((((seed * 2 + i * 5) % 12) + 3) * (days / 14)),
+      });
+    }
+  }
+  missingAngleRanking.sort((a, b) => b.count - a.count);
+
+  const doctorNames = ['张伟', '李静', '王磊', '刘洋', '陈静', '杨帆'];
+  const nurseNames = ['赵雪', '孙丽', '周敏', '吴芳', '郑婷', '黄琳'];
+  const involvedPeople: ClinicInvolvedPerson[] = [];
+  const personCount = 4 + (seed % 4);
+  for (let i = 0; i < personCount; i++) {
+    const isDoctor = i % 2 === 0;
+    const namePool = isDoctor ? doctorNames : nurseNames;
+    const name = namePool[(seed + i) % namePool.length];
+    if (!involvedPeople.find((p) => p.name === name)) {
+      involvedPeople.push({
+        name,
+        role: isDoctor ? 'doctor' : 'nurse',
+        missingCount: Math.round((((seed * 3 + i * 7) % 10) + 1) * (days / 14)),
+      });
+    }
+  }
+  involvedPeople.sort((a, b) => b.missingCount - a.missingCount);
+
+  return {
+    trendDays: days,
+    trendData,
+    missingAngleRanking,
+    involvedPeople,
+  };
 };
 
 export { PHOTO_ANGLE_LABELS };

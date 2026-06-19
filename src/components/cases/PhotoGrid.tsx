@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { Photo, PhotoAngle, QualityFeedback } from '@/types';
 import { PHOTO_ANGLES } from '@/utils/constants';
 import { PHOTO_ANGLE_LABELS } from '@/mock/cases';
 import { useQualityStore } from '@/store/useQualityStore';
-import { AlertCircle, XCircle, ClipboardCheck, X } from 'lucide-react';
+import { AlertCircle, XCircle, ClipboardCheck, X, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface PhotoGridProps {
@@ -30,17 +31,35 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function PhotoGrid({ photos, missingAngles, visitId, caseId }: PhotoGridProps) {
-  const { feedbacks } = useQualityStore();
+  const { feedbacks, selectFeedback, addHighlights } = useQualityStore();
+  const navigate = useNavigate();
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
-  const photoMap = new Map(photos.map((p) => [p.angle, p]));
+  const photoMap = useMemo(() => new Map(photos.map((p) => [p.angle, p])), [photos]);
+
+  const photoFeedbackMap = useMemo(() => {
+    const map = new Map<string, QualityFeedback[]>();
+    photos.forEach((photo) => {
+      const photoFeedbacks = feedbacks.filter(
+        (fb) => fb.caseId === caseId && fb.visitId === visitId && fb.photoId === photo.id
+      );
+      map.set(photo.id, photoFeedbacks);
+    });
+    return map;
+  }, [photos, feedbacks, caseId, visitId]);
 
   const getPhotoFeedbacks = (photoId: string): QualityFeedback[] => {
-    return feedbacks.filter(
-      (fb) => fb.caseId === caseId && fb.visitId === visitId && fb.photoId === photoId
-    );
+    return photoFeedbackMap.get(photoId) || [];
   };
 
   const closeModal = () => setSelectedPhoto(null);
+
+  const handleViewFullQuality = (photoFeedbacks: QualityFeedback[]) => {
+    if (photoFeedbacks.length > 0) {
+      addHighlights(photoFeedbacks.map((fb) => fb.id));
+      selectFeedback(photoFeedbacks[0].id);
+    }
+    navigate('/quality');
+  };
 
   return (
     <>
@@ -48,8 +67,9 @@ export default function PhotoGrid({ photos, missingAngles, visitId, caseId }: Ph
         {PHOTO_ANGLES.map((angleConfig) => {
           const photo = photoMap.get(angleConfig.key);
           const isMissing = missingAngles.includes(angleConfig.key) || !photo;
-          const photoFeedbacks = photo ? getPhotoFeedbacks(photo.id) : [];
+          const photoFeedbacks = photo ? (photoFeedbackMap.get(photo.id) || []) : [];
           const feedbackCount = photoFeedbacks.length;
+          const hasIssues = feedbackCount > 0;
 
           if (isMissing) {
             return (
@@ -82,7 +102,7 @@ export default function PhotoGrid({ photos, missingAngles, visitId, caseId }: Ph
                   )}
                   loading="lazy"
                 />
-                {photo!.hasIssue && (
+                {hasIssues && (
                   <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 bg-red-500 text-white text-[11px] font-medium rounded-lg shadow-md">
                     <AlertCircle className="w-3 h-3" />
                     有问题
@@ -121,12 +141,21 @@ export default function PhotoGrid({ photos, missingAngles, visitId, caseId }: Ph
                   {selectedPhoto.angleLabel}
                 </span>
               </div>
-              <button
-                onClick={closeModal}
-                className="p-2 hover:bg-slate-100 rounded-xl transition-colors"
-              >
-                <X className="w-5 h-5 text-slate-500" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleViewFullQuality(getPhotoFeedbacks(selectedPhoto.id))}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  查看完整质控
+                </button>
+                <button
+                  onClick={closeModal}
+                  className="p-2 hover:bg-slate-100 rounded-xl transition-colors"
+                >
+                  <X className="w-5 h-5 text-slate-500" />
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6">

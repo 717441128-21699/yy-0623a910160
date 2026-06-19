@@ -22,11 +22,19 @@ interface QualityState {
   currentAnnotation: CurrentAnnotation;
   feedbacks: QualityFeedback[];
   selectedPendingIndex: number;
+  highlightedFeedbackIds: string[];
+  selectedFeedbackId: string | null;
   setCurrentAnnotationPhoto: (photoId: string | null) => void;
   addMark: (mark: IssueMark) => void;
   removeMark: (markId: string) => void;
-  submitFeedback: (data: { suggestion: string; assignee: string }) => void;
+  submitFeedback: (data: { suggestion: string; assignee: string }) => string[];
   updateFeedbackStatus: (id: string, status: FeedbackStatus) => void;
+  addHighlights: (ids: string[]) => void;
+  clearHighlights: () => void;
+  selectFeedback: (id: string | null) => void;
+  getFeedbacksByCase: (caseId: string) => QualityFeedback[];
+  getFeedbacksByVisit: (visitId: string) => QualityFeedback[];
+  getFeedbacksByPhoto: (photoId: string) => QualityFeedback[];
   loadInitialData: () => void;
 }
 
@@ -43,6 +51,8 @@ export const useQualityStore = create<QualityState>()(
       },
       feedbacks: [],
       selectedPendingIndex: 0,
+      highlightedFeedbackIds: [],
+      selectedFeedbackId: null,
 
       setCurrentAnnotationPhoto: (photoId: string | null) => {
         const { pendingPhotos } = get();
@@ -82,7 +92,7 @@ export const useQualityStore = create<QualityState>()(
         const { currentAnnotation, pendingPhotos, selectedPendingIndex } = get();
         const pendingItem = pendingPhotos[selectedPendingIndex];
 
-        if (!pendingItem || currentAnnotation.marks.length === 0) return;
+        if (!pendingItem || currentAnnotation.marks.length === 0) return [];
 
         const caseItem = mockCases.find((c) => c.id === pendingItem.caseId);
 
@@ -100,6 +110,8 @@ export const useQualityStore = create<QualityState>()(
           createdAt: new Date().toISOString(),
         }));
 
+        const newFeedbackIds = newFeedbacks.map((fb) => fb.id);
+
         set((state) => ({
           feedbacks: [...newFeedbacks, ...state.feedbacks],
           currentAnnotation: {
@@ -111,6 +123,32 @@ export const useQualityStore = create<QualityState>()(
             Math.min(state.selectedPendingIndex, state.pendingPhotos.length - 2)
           ),
         }));
+
+        return newFeedbackIds;
+      },
+
+      addHighlights: (ids: string[]) => {
+        set({ highlightedFeedbackIds: ids });
+      },
+
+      clearHighlights: () => {
+        set({ highlightedFeedbackIds: [] });
+      },
+
+      selectFeedback: (id: string | null) => {
+        set({ selectedFeedbackId: id });
+      },
+
+      getFeedbacksByCase: (caseId: string) => {
+        return get().feedbacks.filter((fb) => fb.caseId === caseId);
+      },
+
+      getFeedbacksByVisit: (visitId: string) => {
+        return get().feedbacks.filter((fb) => fb.visitId === visitId);
+      },
+
+      getFeedbacksByPhoto: (photoId: string) => {
+        return get().feedbacks.filter((fb) => fb.photoId === photoId);
       },
 
       updateFeedbackStatus: (id: string, status: FeedbackStatus) => {

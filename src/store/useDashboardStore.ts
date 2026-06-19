@@ -16,6 +16,7 @@ import {
   generateDailyData,
   generateTrendData,
   generateMissingAngleDist,
+  generateClinicDetail,
   PHOTO_ANGLE_LABELS,
 } from '../mock/dashboardStats';
 
@@ -27,12 +28,14 @@ interface DashboardState {
   missingAngleDist: MissingAngle[];
   selectedClinicId: string | null;
   clinicDetailData: ClinicDetailData | null;
+  trendDays: number;
   setSelectedDate: (date: string) => void;
   toggleClinic: (id: string) => void;
   setAllClinics: (ids: string[]) => void;
   loadDashboardData: () => void;
   selectClinic: (id: string | null) => void;
   loadClinicDetail: (clinicId: string) => void;
+  setTrendDays: (days: number) => void;
 }
 
 export const useDashboardStore = create<DashboardState>()(
@@ -45,6 +48,7 @@ export const useDashboardStore = create<DashboardState>()(
       missingAngleDist: [],
       selectedClinicId: null,
       clinicDetailData: null,
+      trendDays: 14,
 
       setSelectedDate: (date: string) => {
         const { selectedClinicIds } = get();
@@ -113,66 +117,19 @@ export const useDashboardStore = create<DashboardState>()(
       },
 
       loadClinicDetail: (clinicId: string) => {
-        const clinicIdx = mockClinics.findIndex((c) => c.id === clinicId);
-        const seed = clinicIdx >= 0 ? clinicIdx + 1 : 1;
+        const { trendDays } = get();
+        const detailData = generateClinicDetail(clinicId, trendDays);
+        set({ clinicDetailData: detailData });
+      },
 
-        const formatDate = (d: Date): string => {
-          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        };
-
-        const trend14Days: ClinicDetailTrendPoint[] = [];
-        const today = new Date();
-        for (let i = 13; i >= 0; i--) {
-          const d = new Date(today);
-          d.setDate(today.getDate() - i);
-          const daySeed = i * 5 + seed * 3;
-          trend14Days.push({
-            date: formatDate(d),
-            retakeRate: 3 + (daySeed % 8) + Math.round(((daySeed * 2) % 100) / 100) / 10,
-            retakeCount: 2 + ((daySeed + 1) % 6),
-          });
+      setTrendDays: (days: number) => {
+        const { selectedClinicId } = get();
+        if (selectedClinicId) {
+          const detailData = generateClinicDetail(selectedClinicId, days);
+          set({ trendDays: days, clinicDetailData: detailData });
+        } else {
+          set({ trendDays: days });
         }
-
-        const angles: PhotoAngle[] = ['lateral', 'upperOcclusal', 'lowerOcclusal', 'occlusion', 'overjet', 'overbite', 'frontalSmile', 'lateral45', 'frontal'];
-        const missingAngleRanking: ClinicMissingAngleRank[] = [];
-        const rankCount = Math.min(5 + (seed % 3), angles.length);
-        for (let i = 0; i < rankCount; i++) {
-          const angle = angles[(seed + i) % angles.length];
-          if (!missingAngleRanking.find((m) => m.angle === angle)) {
-            missingAngleRanking.push({
-              angle,
-              label: PHOTO_ANGLE_LABELS[angle],
-              count: ((seed * 2 + i * 5) % 12) + 3,
-            });
-          }
-        }
-        missingAngleRanking.sort((a, b) => b.count - a.count);
-
-        const doctorNames = ['张伟', '李静', '王磊', '刘洋', '陈静', '杨帆'];
-        const nurseNames = ['赵雪', '孙丽', '周敏', '吴芳', '郑婷', '黄琳'];
-        const involvedPeople: ClinicInvolvedPerson[] = [];
-        const personCount = 4 + (seed % 4);
-        for (let i = 0; i < personCount; i++) {
-          const isDoctor = i % 2 === 0;
-          const namePool = isDoctor ? doctorNames : nurseNames;
-          const name = namePool[(seed + i) % namePool.length];
-          if (!involvedPeople.find((p) => p.name === name)) {
-            involvedPeople.push({
-              name,
-              role: isDoctor ? 'doctor' : 'nurse',
-              missingCount: ((seed * 3 + i * 7) % 10) + 1,
-            });
-          }
-        }
-        involvedPeople.sort((a, b) => b.missingCount - a.missingCount);
-
-        set({
-          clinicDetailData: {
-            trend14Days,
-            missingAngleRanking,
-            involvedPeople,
-          },
-        });
       },
     }),
     {

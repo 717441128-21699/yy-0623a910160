@@ -14,9 +14,11 @@ interface CaseState {
 }
 
 const initialFilter: CaseFilter = {
+  clinicId: null,
   doctorId: null,
   nurseId: null,
   stage: null,
+  missingAngle: null,
   dateRange: null,
 };
 
@@ -36,6 +38,10 @@ export const useCaseStore = create<CaseState>((set, get) => ({
     const { cases, filter } = get();
     let result = [...cases];
 
+    if (filter.clinicId) {
+      result = result.filter((c) => c.clinicId === filter.clinicId);
+    }
+
     if (filter.doctorId) {
       result = result.filter((c) => c.doctorId === filter.doctorId);
     }
@@ -47,6 +53,12 @@ export const useCaseStore = create<CaseState>((set, get) => ({
     if (filter.nurseId) {
       result = result.filter((c) =>
         c.visits.some((v) => v.nurseId === filter.nurseId)
+      );
+    }
+
+    if (filter.missingAngle) {
+      result = result.filter((c) =>
+        c.visits.some((v) => v.missingAngles.includes(filter.missingAngle!))
       );
     }
 

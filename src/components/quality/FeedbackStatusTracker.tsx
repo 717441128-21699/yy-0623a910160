@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { CheckCircle2, XCircle, Clock, AlertTriangle, Eye } from 'lucide-react';
 import { useQualityStore } from '@/store/useQualityStore';
 import { mockCases } from '@/mock/cases';
@@ -45,8 +45,10 @@ interface FeedbackWithMeta extends QualityFeedback {
 }
 
 export default function FeedbackStatusTracker() {
-  const { feedbacks, updateFeedbackStatus } = useQualityStore();
+  const { feedbacks, updateFeedbackStatus, highlightedFeedbackIds, selectedFeedbackId } = useQualityStore();
   const [activeTab, setActiveTab] = useState<TabKey>('all');
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const rowRefs = useRef<Map<string, HTMLTableRowElement>>(new Map());
 
   const feedbacksWithMeta = useMemo<FeedbackWithMeta[]>(() => {
     return feedbacks.map((fb) => {
@@ -94,6 +96,21 @@ export default function FeedbackStatusTracker() {
     return counts;
   }, [feedbacksWithMeta]);
 
+  useEffect(() => {
+    if (highlightedFeedbackIds.length > 0 || selectedFeedbackId) {
+      setActiveTab('all');
+      setTimeout(() => {
+        const targetId = highlightedFeedbackIds.length > 0 ? highlightedFeedbackIds[0] : selectedFeedbackId;
+        if (targetId) {
+          const rowElement = rowRefs.current.get(targetId);
+          if (rowElement && scrollContainerRef.current) {
+            rowElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }
+      }, 100);
+    }
+  }, [highlightedFeedbackIds, selectedFeedbackId]);
+
   return (
     <div className="flex h-full flex-col bg-white">
       <div className="border-b border-slate-200 px-6 pt-4">
@@ -128,7 +145,7 @@ export default function FeedbackStatusTracker() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto">
+      <div ref={scrollContainerRef} className="flex-1 overflow-auto">
         {filteredFeedbacks.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-slate-400">
             {activeTab === 'pending' ? (
@@ -172,10 +189,38 @@ export default function FeedbackStatusTracker() {
                 const statusConfig = FEEDBACK_STATUS.find((s) => s.key === fb.status);
                 const issueConfig = ISSUE_TYPES.find((t) => t.key === fb.issueMark.type);
                 const IssueIcon = issueConfig?.icon;
+                const isHighlighted = highlightedFeedbackIds.includes(fb.id);
+                const isSelected = selectedFeedbackId === fb.id;
 
                 return (
-                  <tr key={fb.id} className="transition-colors hover:bg-slate-50/60">
-                    <td className="whitespace-nowrap px-4 py-3">
+                  <tr
+                    key={fb.id}
+                    ref={(el) => {
+                      if (el) rowRefs.current.set(fb.id, el);
+                    }}
+                    className={cn(
+                      'relative transition-colors hover:bg-slate-50/60',
+                      isHighlighted && 'fade-highlight',
+                      isSelected && 'bg-primary-50/60'
+                    )}
+                  >
+                    <td
+                      className={cn(
+                        'whitespace-nowrap py-3',
+                        (isHighlighted || isSelected) ? 'pl-3' : 'px-4'
+                      )}
+                      style={
+                        isHighlighted
+                          ? {
+                              boxShadow: 'inset 4px 0 0 0 #22c55e',
+                            }
+                          : isSelected
+                          ? {
+                              boxShadow: 'inset 4px 0 0 0 #3b82f6',
+                            }
+                          : undefined
+                      }
+                    >
                       <div className="flex items-center gap-3">
                         <div className="relative h-12 w-16 flex-shrink-0 overflow-hidden rounded-md border border-slate-200 bg-slate-100">
                           {fb.thumbUrl ? (

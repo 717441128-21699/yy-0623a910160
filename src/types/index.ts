@@ -156,9 +156,11 @@ export interface PendingPhotoItem {
 }
 
 export interface CaseFilter {
+  clinicId: string | null;
   doctorId: string | null;
   nurseId: string | null;
   stage: TreatmentStage | null;
+  missingAngle: PhotoAngle | null;
   dateRange: [string, string] | null;
 }
 
@@ -186,7 +188,8 @@ export interface ClinicInvolvedPerson {
 }
 
 export interface ClinicDetailData {
-  trend14Days: ClinicDetailTrendPoint[];
+  trendDays: number;
+  trendData: ClinicDetailTrendPoint[];
   missingAngleRanking: ClinicMissingAngleRank[];
   involvedPeople: ClinicInvolvedPerson[];
 }

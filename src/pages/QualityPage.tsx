@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
-import { ImageIcon, ClipboardList, ShieldCheck, BellRing } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { ImageIcon, ClipboardList, ShieldCheck, BellRing, CheckCircle2, ArrowRight, ListChecks } from 'lucide-react';
 import { useQualityStore } from '@/store/useQualityStore';
+import { useCaseStore } from '@/store/useCaseStore';
 import PendingFeedbackList from '@/components/quality/PendingFeedbackList';
 import PhotoAnnotation from '@/components/quality/PhotoAnnotation';
 import IssueSidebar from '@/components/quality/IssueSidebar';
@@ -22,14 +23,49 @@ export default function QualityPage() {
     addMark,
     removeMark,
     loadInitialData,
+    addHighlights,
+    clearHighlights,
+    selectedFeedbackId,
+    highlightedFeedbackIds,
+    selectFeedback,
   } = useQualityStore();
+  const { selectCase } = useCaseStore();
 
   const [activeTab, setActiveTab] = useState<PageTab>('pending');
   const [selectedIssueType, setSelectedIssueType] = useState<IssueType | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [submittedFeedbackIds, setSubmittedFeedbackIds] = useState<string[]>([]);
+  const [submittedAssignee, setSubmittedAssignee] = useState('');
+  const primaryButtonRef = useRef<HTMLButtonElement>(null);
+
+  const handleViewTracker = () => {
+    setActiveTab('tracker');
+  };
+
+  const handleViewCase = (caseId: string) => {
+    selectCase(caseId);
+  };
 
   useEffect(() => {
     loadInitialData();
   }, [loadInitialData]);
+
+  useEffect(() => {
+    if (selectedFeedbackId || (highlightedFeedbackIds && highlightedFeedbackIds.length > 0)) {
+      setActiveTab('tracker');
+    }
+  }, [selectedFeedbackId, highlightedFeedbackIds]);
+
+  useEffect(() => {
+    if (activeTab !== 'tracker') {
+      if (selectedFeedbackId) {
+        selectFeedback(null);
+      }
+      if (highlightedFeedbackIds.length > 0) {
+        clearHighlights();
+      }
+    }
+  }, [activeTab, selectedFeedbackId, highlightedFeedbackIds, selectFeedback, clearHighlights]);
 
   useEffect(() => {
     if (pendingPhotos.length > 0 && currentAnnotation.photoId === null) {
@@ -67,6 +103,44 @@ export default function QualityPage() {
   const handleCancel = () => {
     currentAnnotation.marks.forEach((m) => removeMark(m.id));
     setSelectedIssueType(null);
+  };
+
+  const handleSubmitSuccess = (feedbackIds: string[], assignee: string) => {
+    setSubmittedFeedbackIds(feedbackIds);
+    setSubmittedAssignee(assignee);
+    setShowSuccessModal(true);
+    setTimeout(() => {
+      primaryButtonRef.current?.focus();
+    }, 100);
+  };
+
+  const handleContinueNext = () => {
+    setShowSuccessModal(false);
+    setSubmittedFeedbackIds([]);
+    setSubmittedAssignee('');
+    clearHighlights();
+    if (pendingPhotos.length > 0) {
+      const nextIndex = Math.min(selectedPendingIndex, pendingPhotos.length - 1);
+      const nextPhoto = pendingPhotos[nextIndex]?.photo;
+      if (nextPhoto) {
+        setCurrentAnnotationPhoto(nextPhoto.id);
+      }
+    }
+  };
+
+  const handleGoToTracker = () => {
+    setShowSuccessModal(false);
+    addHighlights(submittedFeedbackIds);
+    setActiveTab('tracker');
+    setTimeout(() => {
+      clearHighlights();
+    }, 2500);
+  };
+
+  const handleCloseModal = () => {
+    setShowSuccessModal(false);
+    setSubmittedFeedbackIds([]);
+    setSubmittedAssignee('');
   };
 
   return (
@@ -151,6 +225,7 @@ export default function QualityPage() {
                   onUpdateMarkDescription={handleUpdateMarkDescription}
                   onRemoveMark={removeMark}
                   onCancel={handleCancel}
+                  onSubmitSuccess={handleSubmitSuccess}
                 />
               </div>
             </div>
@@ -161,10 +236,64 @@ export default function QualityPage() {
           </div>
         ) : (
           <div className="h-full overflow-hidden">
-            <NurseReminderView />
+            <NurseReminderView
+              onViewTracker={handleViewTracker}
+              onViewCase={handleViewCase}
+            />
           </div>
         )}
       </main>
+
+      {showSuccessModal && (
+        <div
+          className="modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm"
+          onClick={handleCloseModal}
+        >
+          <div
+            className="modal-content mx-4 w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="relative bg-gradient-to-br from-green-500 to-emerald-600 px-6 pb-8 pt-10 text-center text-white">
+              <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
+                <CheckCircle2 className="h-12 w-12 text-white" />
+              </div>
+              <h2 className="text-xl font-semibold">反馈提交成功！</h2>
+            </div>
+            <div className="-mt-4 px-6 pb-6">
+              <div className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+                <p className="text-center text-sm text-slate-600">
+                  已向{' '}
+                  <span className="font-semibold text-slate-800">
+                    {submittedAssignee}
+                  </span>{' '}
+                  发送{' '}
+                  <span className="font-semibold text-blue-600">
+                    {submittedFeedbackIds.length}
+                  </span>{' '}
+                  条整改提醒
+                </p>
+              </div>
+              <div className="mt-5 space-y-3">
+                <button
+                  ref={primaryButtonRef}
+                  onClick={handleContinueNext}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                >
+                  <ArrowRight className="h-4 w-4" />
+                  继续标注下一张
+                </button>
+                <button
+                  onClick={handleGoToTracker}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-all hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2"
+                >
+                  <ListChecks className="h-4 w-4" />
+                  前往整改追踪查看
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

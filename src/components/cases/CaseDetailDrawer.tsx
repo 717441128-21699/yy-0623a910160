@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useCaseStore } from '@/store/useCaseStore';
 import { useQualityStore } from '@/store/useQualityStore';
 import VisitTimeline from './VisitTimeline';
@@ -11,13 +12,15 @@ import {
   ClipboardCheck,
   AlertTriangle,
   ShieldCheck,
+  ExternalLink,
 } from 'lucide-react';
 import { TREATMENT_STAGES } from '@/utils/constants';
 import { cn } from '@/lib/utils';
 
 export default function CaseDetailDrawer() {
   const { selectedCaseId, cases, selectCase } = useCaseStore();
-  const { feedbacks } = useQualityStore();
+  const { getFeedbacksByCase, addHighlights, selectFeedback } = useQualityStore();
+  const navigate = useNavigate();
   const selectedCase = cases.find((c) => c.id === selectedCaseId) || null;
 
   const isOpen = !!selectedCase;
@@ -41,12 +44,26 @@ export default function CaseDetailDrawer() {
     return () => window.removeEventListener('keydown', handleEsc);
   }, [selectCase]);
 
-  if (!selectedCase) return null;
+  const caseFeedbacks = useMemo(() => {
+    if (!selectedCase) return [];
+    return getFeedbacksByCase(selectedCase.id);
+  }, [getFeedbacksByCase, selectedCase]);
 
-  const caseFeedbacks = feedbacks.filter((fb) => fb.caseId === selectedCase.id);
   const totalFeedbacks = caseFeedbacks.length;
   const pendingCount = caseFeedbacks.filter((fb) => fb.status === 'pending').length;
   const verifiedCount = caseFeedbacks.filter((fb) => fb.status === 'verified').length;
+  const fixedCount = caseFeedbacks.filter((fb) => fb.status === 'fixed').length;
+
+  const handleGoToQuality = () => {
+    if (caseFeedbacks.length > 0) {
+      addHighlights(caseFeedbacks.map((fb) => fb.id));
+      selectFeedback(caseFeedbacks[0].id);
+    }
+    selectCase(null);
+    navigate('/quality');
+  };
+
+  if (!selectedCase) return null;
 
   const stageConfig = TREATMENT_STAGES.find((s) => s.key === selectedCase.currentStage);
   const avatarColor = selectedCase.patient.gender === 'male'
@@ -116,31 +133,47 @@ export default function CaseDetailDrawer() {
         <div className="flex-1 overflow-y-auto p-6">
           {totalFeedbacks > 0 && (
             <div className="mb-6 p-4 bg-gradient-to-r from-slate-50 to-primary-50/30 rounded-2xl border border-slate-100">
-              <div className="flex items-center gap-2 mb-3">
-                <ClipboardCheck className="w-4 h-4 text-primary-600" />
-                <h3 className="text-sm font-semibold text-slate-700">质控总览</h3>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <ClipboardCheck className="w-4 h-4 text-primary-600" />
+                  <h3 className="text-sm font-semibold text-slate-700">质控总览</h3>
+                </div>
+                <button
+                  onClick={handleGoToQuality}
+                  className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  查看详情
+                </button>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-4 gap-2">
                 <div className="p-3 bg-white rounded-xl shadow-sm border border-slate-100 text-center">
                   <div className="flex items-center justify-center gap-1 mb-1">
-                    <ClipboardCheck className="w-3.5 h-3.5 text-slate-500" />
-                    <span className="text-[11px] text-slate-500 font-medium">累计反馈</span>
+                    <ClipboardCheck className="w-3 h-3 text-slate-500" />
+                    <span className="text-[10px] text-slate-500 font-medium">累计反馈</span>
                   </div>
-                  <p className="text-2xl font-bold text-slate-800">{totalFeedbacks}</p>
+                  <p className="text-xl font-bold text-slate-800">{totalFeedbacks}</p>
                 </div>
                 <div className="p-3 bg-white rounded-xl shadow-sm border border-warning-100 text-center">
                   <div className="flex items-center justify-center gap-1 mb-1">
-                    <AlertTriangle className="w-3.5 h-3.5 text-warning-600" />
-                    <span className="text-[11px] text-warning-600 font-medium">待整改</span>
+                    <AlertTriangle className="w-3 h-3 text-warning-600" />
+                    <span className="text-[10px] text-warning-600 font-medium">待整改</span>
                   </div>
-                  <p className="text-2xl font-bold text-warning-600">{pendingCount}</p>
+                  <p className="text-xl font-bold text-warning-600">{pendingCount}</p>
+                </div>
+                <div className="p-3 bg-white rounded-xl shadow-sm border border-primary-100 text-center">
+                  <div className="flex items-center justify-center gap-1 mb-1">
+                    <ClipboardCheck className="w-3 h-3 text-primary-600" />
+                    <span className="text-[10px] text-primary-600 font-medium">已整改</span>
+                  </div>
+                  <p className="text-xl font-bold text-primary-600">{fixedCount}</p>
                 </div>
                 <div className="p-3 bg-white rounded-xl shadow-sm border border-secondary-100 text-center">
                   <div className="flex items-center justify-center gap-1 mb-1">
-                    <ShieldCheck className="w-3.5 h-3.5 text-secondary-600" />
-                    <span className="text-[11px] text-secondary-600 font-medium">已验证</span>
+                    <ShieldCheck className="w-3 h-3 text-secondary-600" />
+                    <span className="text-[10px] text-secondary-600 font-medium">已验证</span>
                   </div>
-                  <p className="text-2xl font-bold text-secondary-600">{verifiedCount}</p>
+                  <p className="text-xl font-bold text-secondary-600">{verifiedCount}</p>
                 </div>
               </div>
             </div>
@@ -156,7 +189,7 @@ export default function CaseDetailDrawer() {
               <span className="mx-2">·</span>
               最近复诊 <span className="font-semibold text-slate-700">{selectedCase.latestVisitDate}</span>
             </div>
-            <button className="btn-primary">
+            <button onClick={handleGoToQuality} className="btn-primary">
               <FileCheck className="w-4 h-4" />
               进入质控反馈
             </button>

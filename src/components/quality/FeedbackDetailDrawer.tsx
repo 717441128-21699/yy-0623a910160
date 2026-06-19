@@ -11,6 +11,7 @@ import {
   XCircle,
   RotateCcw,
   AlertTriangle,
+  Camera,
 } from 'lucide-react';
 import { useQualityStore } from '@/store/useQualityStore';
 import { mockCases } from '@/mock/cases';
@@ -22,7 +23,7 @@ import type { QualityFeedback, OrthoCase, FollowUpVisit, Photo, Clinic } from '@
 interface FeedbackDetailDrawerProps {
   feedbackId: string | null;
   onClose: () => void;
-  onViewTracker: () => void;
+  onViewTracker: (feedbackId: string) => void;
   onViewCase: (caseId: string) => void;
 }
 
@@ -107,7 +108,7 @@ export default function FeedbackDetailDrawer({
     return () => window.removeEventListener('keydown', handleEsc);
   }, [onClose]);
 
-  if (!feedback || !caseData || !visitData || !photoData) return null;
+  if (!feedback || !caseData) return null;
 
   const statusConfig = FEEDBACK_STATUS.find((s) => s.key === feedback.status);
   const issueTypeConfig = ISSUE_TYPES.find((t) => t.key === feedback.issueMark.type);
@@ -203,74 +204,91 @@ export default function FeedbackDetailDrawer({
                     </div>
                     <div className="flex items-center gap-1">
                       <User className="w-3.5 h-3.5" />
-                      <span>负责护士：{visitData.nurseName}</span>
+                      <span>负责护士：{visitData?.nurseName ?? '未知'}</span>
                     </div>
                   </div>
                 </div>
               </div>
 
               <div className="flex items-center gap-3 mt-4 pt-4 border-t border-slate-100">
-                <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium">
-                  {photoData.angleLabel}
-                </span>
+                {photoData && (
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium">
+                    {photoData.angleLabel}
+                  </span>
+                )}
                 <span className="text-xs text-slate-500 flex items-center gap-1">
                   <Calendar className="w-3.5 h-3.5" />
-                  拍摄时间：{visitData.visitDate}
+                  拍摄时间：{visitData?.visitDate ?? '未知'}
                 </span>
               </div>
             </div>
 
             <div>
               <h4 className="text-sm font-semibold text-slate-700 mb-3">照片与标注</h4>
-              <div className="relative aspect-[4/3] rounded-xl overflow-hidden bg-slate-100 border border-slate-200">
-                <img
-                  src={photoData.url}
-                  alt={photoData.angleLabel}
-                  className="w-full h-full object-cover"
-                />
-                {photoFeedbacks.map((fb, idx) => {
-                  const issueColor =
-                    ISSUE_BG_COLORS[fb.issueMark.type] || 'bg-slate-500';
-                  return (
-                    <div
-                      key={fb.id}
-                      className="absolute border-2 border-white/80 rounded-md shadow-lg cursor-pointer transition-transform hover:scale-[1.02]"
-                      style={{
-                        left: `${fb.issueMark.rect.x * 100}%`,
-                        top: `${fb.issueMark.rect.y * 100}%`,
-                        width: `${fb.issueMark.rect.w * 100}%`,
-                        height: `${fb.issueMark.rect.h * 100}%`,
-                        backgroundColor: 'transparent',
-                      }}
-                      onMouseEnter={() => setHoveredIssue(fb.id)}
-                      onMouseLeave={() => setHoveredIssue(null)}
-                    >
+              {photoData ? (
+                <div className="relative aspect-[4/3] rounded-xl overflow-hidden bg-slate-100 border border-slate-200">
+                  <img
+                    src={photoData.url}
+                    alt={photoData.angleLabel}
+                    className="w-full h-full object-cover"
+                  />
+                  {photoFeedbacks.map((fb, idx) => {
+                    const issueColor =
+                      ISSUE_BG_COLORS[fb.issueMark.type] || 'bg-slate-500';
+                    return (
                       <div
-                        className={cn(
-                          'absolute -top-2 -left-2 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-md',
-                          issueColor
-                        )}
+                        key={fb.id}
+                        className="absolute border-2 border-white/80 rounded-md shadow-lg cursor-pointer transition-transform hover:scale-[1.02]"
+                        style={{
+                          left: `${fb.issueMark.rect.x * 100}%`,
+                          top: `${fb.issueMark.rect.y * 100}%`,
+                          width: `${fb.issueMark.rect.w * 100}%`,
+                          height: `${fb.issueMark.rect.h * 100}%`,
+                          backgroundColor: 'transparent',
+                        }}
+                        onMouseEnter={() => setHoveredIssue(fb.id)}
+                        onMouseLeave={() => setHoveredIssue(null)}
                       >
-                        {idx + 1}
-                      </div>
-                      <div
-                        className={cn('absolute inset-0 rounded-md', issueColor)}
-                        style={{ opacity: 0.15 }}
-                      />
-                      <div
-                        className="absolute inset-0 border-2 rounded-md"
-                        style={{ borderColor: 'inherit' }}
-                      />
-                      {hoveredIssue === fb.id && (
-                        <div className="absolute -top-10 left-1/2 -translate-x-1/2 px-2.5 py-1.5 bg-slate-900 text-white text-xs rounded-lg whitespace-nowrap shadow-lg z-10">
-                          {fb.issueMark.typeLabel}
-                          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-900 rotate-45" />
+                        <div
+                          className={cn(
+                            'absolute -top-2 -left-2 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-md',
+                            issueColor
+                          )}
+                        >
+                          {idx + 1}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                        <div
+                          className={cn('absolute inset-0 rounded-md', issueColor)}
+                          style={{ opacity: 0.15 }}
+                        />
+                        <div
+                          className="absolute inset-0 border-2 rounded-md"
+                          style={{ borderColor: 'inherit' }}
+                        />
+                        {hoveredIssue === fb.id && (
+                          <div className="absolute -top-10 left-1/2 -translate-x-1/2 px-2.5 py-1.5 bg-slate-900 text-white text-xs rounded-lg whitespace-nowrap shadow-lg z-10">
+                            {fb.issueMark.typeLabel}
+                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-900 rotate-45" />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="aspect-[4/3] rounded-xl overflow-hidden bg-slate-100 border border-slate-200 flex flex-col items-center justify-center gap-3">
+                  <div className="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center">
+                    <Camera className="w-8 h-8 text-slate-400" />
+                  </div>
+                  <p className="text-sm text-slate-400">照片信息暂缺</p>
+                  {feedback.issueMark.rect && (
+                    <p className="text-xs text-slate-400">
+                      标注区域：左上角 ({Math.round(feedback.issueMark.rect.x * 100)}%, {Math.round(feedback.issueMark.rect.y * 100)}%)
+                      ，尺寸 {Math.round(feedback.issueMark.rect.w * 100)}%×{Math.round(feedback.issueMark.rect.h * 100)}%
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             <div>
@@ -435,7 +453,7 @@ export default function FeedbackDetailDrawer({
         <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 shrink-0">
           <div className="flex items-center justify-between">
             <button
-              onClick={onViewTracker}
+              onClick={() => onViewTracker(feedback.id)}
               className="flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
             >
               <span>跳转整改追踪</span>

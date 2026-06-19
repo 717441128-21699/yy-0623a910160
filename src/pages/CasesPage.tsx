@@ -13,7 +13,6 @@ export default function CasesPage() {
   const {
     loadCases,
     filteredCases,
-    applyFilter,
     cases,
   } = useCaseStore();
   const { loadInitialData } = useQualityStore();
@@ -21,10 +20,8 @@ export default function CasesPage() {
   useEffect(() => {
     if (cases.length === 0) {
       loadCases();
-    } else {
-      applyFilter();
     }
-  }, [applyFilter, cases.length, loadCases]);
+  }, [cases.length, loadCases]);
 
   useEffect(() => {
     loadInitialData();

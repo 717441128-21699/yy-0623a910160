@@ -38,7 +38,9 @@ export default function QualityPage() {
   const [submittedAssignee, setSubmittedAssignee] = useState('');
   const primaryButtonRef = useRef<HTMLButtonElement>(null);
 
-  const handleViewTracker = () => {
+  const handleViewTracker = (feedbackId: string) => {
+    addHighlights([feedbackId]);
+    selectFeedback(feedbackId);
     setActiveTab('tracker');
   };
 
@@ -120,11 +122,7 @@ export default function QualityPage() {
     setSubmittedAssignee('');
     clearHighlights();
     if (pendingPhotos.length > 0) {
-      const nextIndex = Math.min(selectedPendingIndex, pendingPhotos.length - 1);
-      const nextPhoto = pendingPhotos[nextIndex]?.photo;
-      if (nextPhoto) {
-        setCurrentAnnotationPhoto(nextPhoto.id);
-      }
+      setCurrentAnnotationPhoto(pendingPhotos[0].photo.id);
     }
   };
 

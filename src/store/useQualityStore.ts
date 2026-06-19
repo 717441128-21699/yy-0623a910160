@@ -36,6 +36,7 @@ interface QualityState {
   getFeedbacksByVisit: (visitId: string) => QualityFeedback[];
   getFeedbacksByPhoto: (photoId: string) => QualityFeedback[];
   loadInitialData: () => void;
+  refreshPendingPhotos: () => void;
 }
 
 const genId = (): string =>
@@ -56,18 +57,32 @@ export const useQualityStore = create<QualityState>()(
 
       setCurrentAnnotationPhoto: (photoId: string | null) => {
         const { pendingPhotos } = get();
-        const index = photoId
-          ? pendingPhotos.findIndex((item) => item.photo.id === photoId)
-          : -1;
-        const pendingItem = index >= 0 ? pendingPhotos[index] : null;
-        const marks = pendingItem?.photo.issueMarks ?? [];
-        set({
-          selectedPendingIndex: index >= 0 ? index : 0,
-          currentAnnotation: {
-            photoId,
-            marks: marks.length > 0 ? [...marks] : [],
-          },
-        });
+        if (!photoId) {
+          set({
+            selectedPendingIndex: 0,
+            currentAnnotation: { photoId: null, marks: [] },
+          });
+          return;
+        }
+        const index = pendingPhotos.findIndex((item) => item.photo.id === photoId);
+        if (index >= 0) {
+          const marks = pendingPhotos[index].photo.issueMarks ?? [];
+          set({
+            selectedPendingIndex: index,
+            currentAnnotation: { photoId, marks: marks.length > 0 ? [...marks] : [] },
+          });
+        } else if (pendingPhotos.length > 0) {
+          const marks = pendingPhotos[0].photo.issueMarks ?? [];
+          set({
+            selectedPendingIndex: 0,
+            currentAnnotation: { photoId: pendingPhotos[0].photo.id, marks: marks.length > 0 ? [...marks] : [] },
+          });
+        } else {
+          set({
+            selectedPendingIndex: 0,
+            currentAnnotation: { photoId: null, marks: [] },
+          });
+        }
       },
 
       addMark: (mark: IssueMark) => {
@@ -118,11 +133,17 @@ export const useQualityStore = create<QualityState>()(
             photoId: null,
             marks: [],
           },
-          selectedPendingIndex: Math.max(
-            0,
-            Math.min(state.selectedPendingIndex, state.pendingPhotos.length - 2)
-          ),
         }));
+
+        const updatedFeedbacks = get().feedbacks;
+        const feedbackPhotoIds = new Set(updatedFeedbacks.map((fb) => fb.photoId));
+        const allPending = extractPendingPhotos(mockCases);
+        const filtered = allPending.filter((item) => !feedbackPhotoIds.has(item.photo.id));
+
+        set({
+          pendingPhotos: filtered,
+          selectedPendingIndex: 0,
+        });
 
         return newFeedbackIds;
       },
@@ -167,6 +188,14 @@ export const useQualityStore = create<QualityState>()(
         }));
       },
 
+      refreshPendingPhotos: () => {
+        const { feedbacks } = get();
+        const feedbackPhotoIds = new Set(feedbacks.map((fb) => fb.photoId));
+        const allPending = extractPendingPhotos(mockCases);
+        const filtered = allPending.filter((item) => !feedbackPhotoIds.has(item.photo.id));
+        set({ pendingPhotos: filtered, selectedPendingIndex: 0 });
+      },
+
       loadInitialData: () => {
         const pending = extractPendingPhotos(mockCases);
         const existingFeedbacks = get().feedbacks;
@@ -180,8 +209,11 @@ export const useQualityStore = create<QualityState>()(
           mergedFeedbacks = [...mockFeedbacks];
         }
 
+        const feedbackPhotoIds = new Set(mergedFeedbacks.map((fb) => fb.photoId));
+        const filtered = pending.filter((item) => !feedbackPhotoIds.has(item.photo.id));
+
         set({
-          pendingPhotos: pending,
+          pendingPhotos: filtered,
           feedbacks: mergedFeedbacks,
           selectedPendingIndex: 0,
           currentAnnotation: {

@@ -9,7 +9,7 @@ import type { QualityFeedback } from '@/types';
 import FeedbackDetailDrawer from './FeedbackDetailDrawer';
 
 interface NurseReminderViewProps {
-  onViewTracker: () => void;
+  onViewTracker: (feedbackId: string) => void;
   onViewCase: (caseId: string) => void;
 }
 
